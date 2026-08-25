@@ -1,4 +1,5 @@
 import { getPerformanceOverview } from "@/lib/performance-data";
+import { collectDemoPerformanceAction } from "./actions";
 
 function EmptyState({ message }: { message: string }) {
   return (
@@ -37,17 +38,59 @@ function QualifiedBadge({ qualified }: { qualified: boolean }) {
   );
 }
 
-export default async function PerformancePage() {
+export default async function PerformancePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ collected?: string; target?: string }>;
+}) {
   const { metrics, leads, qualifiedLeadCount } = await getPerformanceOverview();
+  const params = await searchParams;
 
   return (
     <main className="flex-1 mx-auto w-full max-w-6xl px-6 py-10 flex flex-col gap-8">
       <header>
         <h1 className="text-2xl font-bold">성과 / 리드 (Stage 7)</h1>
         <p className="text-neutral-500 dark:text-neutral-400">
-          Performance Collection &amp; Lead Tracking — 현재는 조회 전용 화면입니다.
+          Performance Collection &amp; Lead Tracking
         </p>
       </header>
+
+      <section className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 p-5 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-block rounded bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 text-xs font-semibold px-2 py-0.5 uppercase tracking-wide">
+            Demo / Mock Connector
+          </span>
+          <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+            성과 수집 (데모)
+          </h2>
+        </div>
+        <p className="text-sm text-amber-900 dark:text-amber-100">
+          실제 YouTube / LinkedIn 등 외부 마케팅 API에는 연결되어 있지
+          않습니다. 아래 버튼은 미리 정해진 가짜(mock) 성과·리드 데이터를
+          Supabase에 저장하는 <strong>데모 전용 기능</strong>입니다. 이미
+          데모로 수집한 콘텐츠는 다시 클릭해도 중복 저장되지 않습니다.
+        </p>
+        <form action={collectDemoPerformanceAction}>
+          <button
+            type="submit"
+            className="rounded-md bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-4 py-2 w-fit"
+          >
+            Collect Performance (Demo)
+          </button>
+        </form>
+        {params.collected === "1" && (
+          <p className="text-sm text-emerald-700 dark:text-emerald-300">
+            ✅ 데모 성과 1건 + Qualified Lead 1건이 추가되었습니다 (대상:{" "}
+            {params.target}).
+          </p>
+        )}
+        {params.collected === "none" && (
+          <p className="text-sm text-neutral-600 dark:text-neutral-300">
+            ℹ️ 모든 콘텐츠가 이미 데모 커넥터로 수집되어, 더 추가할 데모
+            데이터가 없습니다 (중복 방지).
+          </p>
+        )}
+      </section>
 
       <section className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
