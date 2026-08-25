@@ -7,11 +7,12 @@ This document defines the PostgreSQL schema for Ganache's Codepresso Marketing A
 The database is not a generic CMS. It is the **shared memory** between:
 
 - a **web UI** (human-facing dashboard and input surface),
-- **Agent 1 (Idea / Planning)**,
-- **Agent 2 (Content Generation)**,
-- **Agent 3 (Review / Optimization)**,
-- a **performance collection process**, and
-- an **insight generation process**.
+- **Agent 1 — Strategy** (stages ①–② Idea + Planning),
+- **Agent 2 — Content & Distribution** (stages ③–⑥ Writing, Editing, Publishing, SNS Distribution),
+- **Agent 3 — Measurement & Learning** (stages ⑦–⑧ Performance Collection + Insight), and
+- a **Review / Risk Check gate** — not owned by one agent, but a cross-cutting human-approval checkpoint that sits between stages (see Section 8).
+
+> This 3-agent framing was revised from an earlier draft (Agent 1 = Idea/Planning, Agent 2 = Content Generation, Agent 3 = Review/Optimization) after mentor feedback pointed out it left stages ⑤–⑧ ambiguous. The new split matches how the team actually divides work: strategy → content & distribution → measurement.
 
 Every table exists to support one loop:
 
@@ -35,36 +36,34 @@ BUSINESS CONTEXT + CURRENT TRENDS + PAST CONTENT + PAST PERFORMANCE + PAST INSIG
 
 No existing backend, ORM, or migration tool was found in this repository at the time of writing (only `CLAUDE.md` and the Builderthon problem PDF exist). This schema is therefore designed **PostgreSQL-first**, with plain SQL DDL that can be dropped into any standard migration tool (Prisma, Knex, node-pg-migrate, Alembic, Flyway, etc.) later without conceptual changes.
 
-`docs/tone-and-manner.md` and a locked frontend/backend stack do not exist yet either. This schema does not assume their contents — `business_context.tone_and_manner` is a plain text/JSONB field that the eventual Tone & Manner guide can populate, not a hard-coded structure.
+`docs/tone-and-manner.md` now exists (Ayoung's canonical guide). `business_context.tone_and_manner` deliberately does **not** duplicate it — see Section 6 and Section 13 for why.
 
 ## 2. Architecture & Data Flow
 
 ```
 Web UI
   ↓ writes business_context, reads everything
-PostgreSQL  ←──────────────────────────────────────────────┐
-  ↓ (business_context, trends, contents, content_metrics,   │
-  │  content_insights)                                      │
-Agent 1: Idea / Planning                                    │
-  ↓ writes ideas                                            │
-PostgreSQL ───────────────────────────────────────────────► │
-  ↓ (ideas, business_context, trends, contents,             │
-  │  content_insights)                                      │
-Agent 2: Content Generation                                 │
-  ↓ writes contents                                         │
-PostgreSQL ───────────────────────────────────────────────► │
-  ↓ (contents, business_context, trends, content_insights)  │
-Agent 3: Review / Optimization                              │
-  ↓ writes content_reviews (and updates contents.status)    │
-PostgreSQL ───────────────────────────────────────────────► │
-  ↓ (approved contents)                                     │
-Publishing → SNS Distribution                               │
-  ↓ writes contents.published_at / published_url            │
-Performance Collection                                      │
-  ↓ writes content_metrics                                  │
-Insight Generation                                          │
-  ↓ writes content_insights (+ links via insight_sources)   │
-  └─────────────────────────────────────────────────────────┘
+PostgreSQL  ←──────────────────────────────────────────────────┐
+  ↓ (business_context, trends, contents, content_latest_metrics,│
+  │  content_insights)                                          │
+Agent 1 — Strategy (Idea + Planning, ①–②)                       │
+  ↓ writes ideas                                                │
+PostgreSQL ───────────────────────────────────────────────────► │
+  ↓ (ideas, business_context, trends, contents,                 │
+  │  content_insights)                                          │
+Agent 2 — Content & Distribution (Writing/Editing/Publishing/SNS,│
+           ③–⑥)                                                 │
+  ↓ writes contents, content_publications                       │
+PostgreSQL ───────────────────────────────────────────────────► │
+  ↓ (contents pending review, business_context, trends)         │
+Review / Risk Check — cross-cutting gate between stages          │
+  ↓ writes content_reviews (and updates contents.status)        │
+PostgreSQL ───────────────────────────────────────────────────► │
+  ↓ (published contents, content_publications)                  │
+Agent 3 — Measurement & Learning (Performance Collection +       │
+           Insight, ⑦–⑧)                                        │
+  ↓ writes content_metrics, lead_events, content_insights        │
+  └─────────────────────────────────────────────────────────────┘
         (insights feed Agent 1's next read, closing the loop)
 ```
 
@@ -73,7 +72,7 @@ PostgreSQL sits in the middle of every arrow. No agent keeps its own private cop
 ## 3. Database Design Principles
 
 1. **PostgreSQL is the single source of truth.** Agents are stateless between runs; they read and write through the database, not through files, memory, or prompt history. This prevents Agent 1, Agent 2, and Agent 3 from silently drifting into inconsistent views of "what Codepresso is" or "what happened before."
-2. **Leads are a first-class column, not a derived afterthought.** `content_metrics.leads` and the generated `conversion_rate` column exist specifically because the challenge states views/impressions alone do not count as success.
+2. **Leads are events, not just a number.** `lead_events` records each individual inquiry (which content, which channel, which type, qualified or not) — the real requirement from the challenge is tracing *which content generated which inquiry*, not just a weekly total. `content_metrics.leads` still exists as the aggregate figure used for quick reporting, and should reconcile with `count(lead_events)` where event-level detail is available.
 3. **The feedback loop must be traceable with real foreign keys**, not comma-separated ID lists: `idea_trends`, `content_trends`, `insight_sources`, and `idea_insights` are proper many-to-many junction tables.
 4. **Human approval is a first-class workflow step**, represented by `content_reviews`, not just a status flag with no audit trail.
 5. **MVP over enterprise design.** No user/auth system, no polymorphic "universal provenance" table, no per-platform metrics explosion, no premature versioning machinery. Where a tradeoff was made for simplicity, it is called out in Section 13.
@@ -88,10 +87,12 @@ PostgreSQL sits in the middle of every arrow. No agent keeps its own private cop
 | `trends` | External news/issues/trends collected as planning input |
 | `ideas` | Content ideas proposed by Agent 1 |
 | `idea_trends` | Many-to-many: which trends informed which idea |
-| `contents` | The central content entity (draft → review → approved → published) |
+| `contents` | The central content entity (draft → review → approved → published); `content_group_id` links channel variants of the same idea |
 | `content_trends` | Many-to-many: which trends a piece of content directly references |
-| `content_reviews` | Human (or Agent 3) review/approval events for a content item |
-| `content_metrics` | Periodic performance snapshots per content item (views, clicks, leads) |
+| `content_reviews` | Human review/approval events for a content item (cross-cutting quality gate) |
+| `content_publications` | One row per publish/distribution action for a content item (merges stages ⑤ Upload + ⑥ SNS Distribution) |
+| `content_metrics` | Periodic performance snapshots per content item (views, clicks, aggregate leads) |
+| `lead_events` | One row per individual inquiry/lead, attributed to a content item and channel |
 | `content_insights` | Structured, reusable insights derived from performance |
 | `insight_sources` | Many-to-many: which content items are evidence for an insight |
 | `idea_insights` | Many-to-many: which insights informed a given idea |
@@ -105,6 +106,7 @@ erDiagram
         boolean is_current
         text company_name
         text tone_and_manner
+        text tone_guide_version
     }
 
     channels {
@@ -129,10 +131,10 @@ erDiagram
     contents {
         uuid id PK
         uuid idea_id FK
+        uuid content_group_id FK
         text title
         text channel FK
         text status
-        timestamptz published_at
     }
 
     content_reviews {
@@ -142,6 +144,15 @@ erDiagram
         text review_status
     }
 
+    content_publications {
+        uuid id PK
+        uuid content_id FK
+        text channel FK
+        text role
+        text publish_status
+        text distribution_status
+    }
+
     content_metrics {
         uuid id PK
         uuid content_id FK
@@ -149,6 +160,15 @@ erDiagram
         int leads
         numeric conversion_rate
         timestamptz collected_at
+    }
+
+    lead_events {
+        uuid id PK
+        uuid content_id FK
+        text channel FK
+        text inquiry_type
+        boolean qualified
+        timestamptz created_at
     }
 
     content_insights {
@@ -180,13 +200,18 @@ erDiagram
 
     channels ||--o{ ideas : "recommended_channel"
     channels ||--o{ contents : "channel"
+    channels ||--o{ content_publications : "channel"
+    channels ||--o{ lead_events : "channel"
     ideas ||--o{ contents : "becomes"
     ideas ||--o{ idea_trends : "informed by"
     trends ||--o{ idea_trends : "informs"
     contents ||--o{ content_trends : "references"
     trends ||--o{ content_trends : "referenced by"
+    contents ||--o{ contents : "content_group_id (siblings)"
     contents ||--o{ content_reviews : "reviewed via"
+    contents ||--o{ content_publications : "published/distributed via"
     contents ||--o{ content_metrics : "measured via"
+    contents ||--o{ lead_events : "attributed leads"
     contents ||--o{ content_insights : "yields"
     content_insights ||--o{ insight_sources : "evidenced by"
     contents ||--o{ insight_sources : "is evidence for"
@@ -201,6 +226,8 @@ erDiagram
 ### `business_context`
 Codepresso's reusable brand/business knowledge. Evolves over time via simple "current version" versioning rather than full temporal history — an MVP tradeoff (Section 13). Every agent reads the one row where `is_current = true`.
 
+`tone_and_manner` holds a **short operational summary** (a few sentences an agent can drop straight into a prompt), not the full guide — the canonical, detailed brand voice rules live in `docs/tone-and-manner.md` (maintained by Ayoung). `tone_guide_version` records which version of that document the summary reflects (e.g. `"tone-and-manner.md v1 (2026-08-24)"`), so the two can be reconciled instead of silently drifting apart.
+
 ### `channels`
 A tiny seeded reference table (`blog_kr`, `blog_en`, `linkedin`, `youtube`, `newsletter`, `pr`, `webinar`, `other`). Exists so `contents.channel` and `ideas.recommended_channel` are foreign-key-checked instead of freeform strings that can typo-drift across 30+ pieces of content a month.
 
@@ -211,13 +238,21 @@ External issues/news/trends collected as raw planning input for Agent 1. Not a n
 Content ideas, each optionally traceable back to the trends and insights that produced it, and forward to the content it became.
 
 ### `contents`
-The central pipeline entity. Tracks lifecycle status, which idea it came from, which channel it targets, and publishing metadata.
+The central pipeline entity. Tracks lifecycle status, which idea it came from, and which channel it targets. Publishing/distribution metadata now lives in `content_publications` (see below), not on this table.
+
+`content_group_id` (nullable, self-referencing) links channel variants written from the same idea — e.g. a blog article and its LinkedIn/newsletter adaptations. The first content row in a family leaves it `NULL`; sibling rows point at that first row's `id`. This is a grouping hint for the UI/agents, not a separate table — kept deliberately lightweight for the MVP.
 
 ### `content_reviews`
-One row per review event (append-only audit trail — a reviewer resubmitting review creates a new row rather than overwriting history). Represents the human-in-the-loop checkpoint the challenge requires.
+One row per review event (append-only audit trail — a reviewer resubmitting review creates a new row rather than overwriting history). Represents the human-in-the-loop checkpoint the challenge requires. This is a **cross-cutting gate**, not something only one agent triggers — it can sit between idea→content, draft→approved, or publish→distribute.
+
+### `content_publications`
+One row per publish/distribution action for a content item — merges what used to be split across Stage ⑤ (Upload) and Stage ⑥ (SNS Distribution). `role` distinguishes a content's primary publish (`'primary'`) from a secondary cross-post/share (`'secondary'`), so e.g. a blog post published to `blog_kr` and then shared as a LinkedIn post both show up here, each with its own `scheduled_at`, `publish_status`, `platform_url`, and `distribution_status`. A content item can have multiple rows here (one per destination); `contents.status = 'published'` is the coarse pipeline signal, this table is the itemized ledger behind it.
 
 ### `content_metrics`
-Periodic performance snapshots (cumulative totals as of `collected_at`, matching the team's current "collect numbers every Friday" habit). Time-series, not a single row per content — multiple snapshots over a content's life are expected and useful.
+Periodic performance snapshots (cumulative totals as of `collected_at`, matching the team's current "collect numbers every Friday" habit). Time-series, not a single row per content — multiple snapshots over a content's life are expected and useful. `leads` here is an aggregate figure for quick reporting; see `lead_events` for per-inquiry detail.
+
+### `lead_events`
+One row per individual inquiry, so "3 leads" is traceable evidence (which content, which channel, what type of inquiry, whether it was actually a qualified B2B lead) instead of an opaque number. `content_id`/`channel` are nullable because not every inbound inquiry can always be attributed to a specific piece of content, but should be filled in whenever attribution is known.
 
 ### `content_insights`
 Structured, reusable statements like *"content addressing enterprise decision-makers converts better than developer-focused content."* Deliberately generalized above the level of a single `content_id` — see `insight_sources` below.
@@ -231,36 +266,34 @@ Pure many-to-many junction tables. These are what make "performance → insight 
 - `ideas (1) ── (N) contents` — one idea can spawn multiple content pieces (e.g. a blog post *and* a LinkedIn post from the same idea).
 - `ideas (N) ── (N) trends` via `idea_trends` — an idea can be informed by multiple trends; a trend can seed multiple ideas.
 - `contents (N) ── (N) trends` via `content_trends` — for content that cites a trend directly, independent of which idea it came from.
+- `contents (1) ── (N) contents` via `content_group_id` — self-referencing; groups channel variants (blog/LinkedIn/newsletter) written from the same idea.
 - `contents (1) ── (N) content_reviews` — full review history per content.
+- `contents (1) ── (N) content_publications` — one row per channel the content is published/distributed to (merges old Stage ⑤+⑥).
 - `contents (1) ── (N) content_metrics` — performance over time per content.
+- `contents (1) ── (N) lead_events` — individual inquiries attributed to this content.
 - `contents (1) ── (N) content_insights`, with `content_insights (N) ── (N) contents` via `insight_sources` for insights generalized across multiple content items.
 - `ideas (N) ── (N) content_insights` via `idea_insights` — records exactly which insights led to which new idea, closing the loop with a real, queryable edge.
 
 ## 8. Agent Read / Write Contract
 
-**Agent 1 — Idea / Planning**
-- READ: `business_context` (current), `trends`, `contents` (past), `content_metrics` (via `content_latest_metrics`), `content_insights`
+This was revised from an earlier draft where "Agent 3 = Review/Optimization" left stages ⑤–⑧ unclear about who does what. Review/approval is reframed as a **cross-cutting gate** rather than one agent's job, matching how the team actually splits work.
+
+**Agent 1 — Strategy (stages ① Idea + ② Planning)**
+- READ: `business_context` (current), `trends`, `contents` (past), `content_latest_metrics`, `content_insights`
 - WRITE: `ideas`, `idea_trends`, `idea_insights`
 
-**Agent 2 — Content Generation**
+**Agent 2 — Content & Distribution (stages ③ Writing, ④ Editing, ⑤ Publishing, ⑥ SNS Distribution)**
 - READ: `business_context` (current), `ideas` (selected), `trends`, `contents` (past, for style/precedent), `content_insights`
-- WRITE: `contents`, `content_trends`
+- WRITE: `contents` (including `content_group_id` when producing a channel variant), `content_trends`, `content_publications`
 
-**Agent 3 — Review / Optimization**
+**Agent 3 — Measurement & Learning (stages ⑦ Performance Collection + ⑧ Insight)**
+- READ: `contents`, `content_publications` (to know what's actually live and where), `content_metrics`, historical `content_insights`
+- WRITE: `content_metrics`, `lead_events`, `content_insights`, `insight_sources`
+
+**Review / Risk Check — cross-cutting quality gate (human-in-the-loop, not tied to one agent)**
+Can sit between idea → content (is this worth writing), draft → approved (is this ready to publish), or publish → distribute (is secondary distribution appropriate). Triggered by whichever agent reaches that checkpoint, but the decision itself is a human approval.
 - READ: `contents` (draft), `business_context` (current, for tone/prohibited terms/sensitive-info rules), `trends`, `content_insights`
 - WRITE: `content_reviews`, and updates `contents.status`
-
-**Publishing / SNS Distribution** (human-triggered or automated once approved)
-- READ: `contents` where `status = 'approved'`
-- WRITE: `contents.status`, `contents.published_at`, `contents.published_url`
-
-**Performance Collection**
-- READ: `contents` where `status = 'published'`
-- WRITE: `content_metrics`
-
-**Insight Generation**
-- READ: `contents`, `content_metrics` (via `content_latest_metrics`), historical `content_insights`
-- WRITE: `content_insights`, `insight_sources`
 
 ## 9. PostgreSQL DDL
 
@@ -305,7 +338,8 @@ CREATE TABLE business_context (
     products_services       TEXT,
     value_propositions      TEXT,
     brand_positioning       TEXT,
-    tone_and_manner         TEXT,
+    tone_and_manner         TEXT,        -- short operational summary; full guide lives in docs/tone-and-manner.md
+    tone_guide_version      TEXT,        -- e.g. 'tone-and-manner.md v1 (2026-08-24)' — which version of that doc this summary reflects
     preferred_terminology   JSONB NOT NULL DEFAULT '{}',   -- e.g. {"AI 역량진단": "always use this term, not 'AI 테스트'"}
     prohibited_terminology  JSONB NOT NULL DEFAULT '{}',
     sensitive_topics        TEXT,        -- guidance on what needs management approval (pricing, named customers, contract terms)
@@ -379,6 +413,7 @@ CREATE TABLE idea_trends (
 CREATE TABLE contents (
     id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     idea_id                UUID REFERENCES ideas(id) ON DELETE SET NULL,
+    content_group_id       UUID REFERENCES contents(id) ON DELETE SET NULL,  -- links sibling channel variants of the same idea; NULL on the first/original row
     title                  TEXT NOT NULL,
     body                   TEXT,                -- Markdown
     thumbnail_text         TEXT,
@@ -386,8 +421,6 @@ CREATE TABLE contents (
     status                 TEXT NOT NULL DEFAULT 'draft'
                            CHECK (status IN ('draft', 'review', 'approved', 'published', 'rejected', 'archived')),
     contains_sensitive_info BOOLEAN NOT NULL DEFAULT false,  -- customer names / pricing / contract terms present
-    published_at           TIMESTAMPTZ,
-    published_url          TEXT,
     created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -404,6 +437,32 @@ CREATE TABLE content_trends (
     trend_id   UUID NOT NULL REFERENCES trends(id)   ON DELETE CASCADE,
     PRIMARY KEY (content_id, trend_id)
 );
+
+-- =========================================================
+-- content_publications (merges Stage 5 Upload + Stage 6 SNS Distribution)
+-- =========================================================
+CREATE TABLE content_publications (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    content_id          UUID NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
+    channel             TEXT NOT NULL REFERENCES channels(id) ON DELETE RESTRICT,
+    role                TEXT NOT NULL DEFAULT 'primary'
+                        CHECK (role IN ('primary', 'secondary')),  -- primary = Stage 5 upload, secondary = Stage 6 cross-post
+    scheduled_at        TIMESTAMPTZ,
+    publish_status      TEXT NOT NULL DEFAULT 'scheduled'
+                        CHECK (publish_status IN ('scheduled', 'published', 'failed', 'skipped')),
+    published_at        TIMESTAMPTZ,
+    platform_post_id    TEXT,
+    platform_url        TEXT,
+    distribution_status TEXT NOT NULL DEFAULT 'pending'
+                        CHECK (distribution_status IN ('pending', 'distributed', 'skipped')),
+    distributed_at      TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER content_publications_set_updated_at
+    BEFORE UPDATE ON content_publications
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- =========================================================
 -- content_reviews (append-only)
@@ -438,6 +497,20 @@ CREATE TABLE content_metrics (
                     ) STORED,
     extra_metrics   JSONB NOT NULL DEFAULT '{}',  -- channel-specific extras: impressions, opens, attendees, watch_time...
     collected_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- =========================================================
+-- lead_events (append-only) — individual inquiry-level attribution
+-- =========================================================
+CREATE TABLE lead_events (
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    content_id         UUID REFERENCES contents(id) ON DELETE SET NULL,
+    channel            TEXT REFERENCES channels(id) ON DELETE SET NULL,
+    inquiry_type       TEXT NOT NULL DEFAULT 'other'
+                       CHECK (inquiry_type IN ('contact_form', 'demo_request', 'newsletter_signup', 'webinar_registration', 'email', 'other')),
+    qualified          BOOLEAN NOT NULL DEFAULT false,  -- is this a genuine B2B sales-worthy inquiry, not just any form submission
+    attribution_source TEXT,  -- e.g. UTM string, referrer, or how this event was linked back to the content
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- =========================================================
@@ -479,14 +552,23 @@ CREATE TABLE idea_insights (
 CREATE INDEX idx_contents_status        ON contents (status);
 CREATE INDEX idx_contents_channel       ON contents (channel);
 CREATE INDEX idx_contents_idea_id       ON contents (idea_id);
-CREATE INDEX idx_contents_approved_unpublished
-    ON contents (id)
-    WHERE status = 'approved' AND published_at IS NULL;
+CREATE INDEX idx_contents_group_id      ON contents (content_group_id);
+
+-- content_publications: "approved but not yet published" + distribution queue
+CREATE INDEX idx_content_publications_content_id ON content_publications (content_id);
+CREATE INDEX idx_content_publications_pending
+    ON content_publications (content_id)
+    WHERE publish_status = 'scheduled' OR distribution_status = 'pending';
 
 -- content_metrics: "latest per content" and "top by leads" queries
 CREATE INDEX idx_content_metrics_content_collected
     ON content_metrics (content_id, collected_at DESC);
 CREATE INDEX idx_content_metrics_leads ON content_metrics (leads DESC);
+
+-- lead_events: attribution look-ups
+CREATE INDEX idx_lead_events_content_id ON lead_events (content_id);
+CREATE INDEX idx_lead_events_channel    ON lead_events (channel);
+CREATE INDEX idx_lead_events_created_at ON lead_events (created_at DESC);
 
 -- content_reviews: pending queue + per-content history
 CREATE INDEX idx_content_reviews_content_id ON content_reviews (content_id);
@@ -523,7 +605,8 @@ ORDER BY content_id, collected_at DESC;
 -- One row per content item, for the dashboard pipeline view.
 CREATE VIEW content_pipeline_overview AS
 SELECT
-    c.id, c.title, c.channel, c.status, c.published_at,
+    c.id, c.title, c.channel, c.status, c.content_group_id,
+    pub.published_at, pub.platform_url,
     lm.views, lm.leads, lm.conversion_rate,
     lr.review_status AS latest_review_status
 FROM contents c
@@ -534,7 +617,14 @@ LEFT JOIN LATERAL (
     WHERE r.content_id = c.id
     ORDER BY r.created_at DESC
     LIMIT 1
-) lr ON true;
+) lr ON true
+LEFT JOIN LATERAL (
+    SELECT published_at, platform_url
+    FROM content_publications p
+    WHERE p.content_id = c.id AND p.role = 'primary'
+    ORDER BY p.created_at DESC
+    LIMIT 1
+) pub ON true;
 ```
 
 ## 11. Key Queries / Access Patterns
@@ -571,7 +661,12 @@ WHERE t.collected_at > now() - interval '14 days';
 SELECT * FROM contents WHERE status = 'review';
 
 -- 8. Approved but not yet published
-SELECT * FROM contents WHERE status = 'approved' AND published_at IS NULL;
+SELECT c.* FROM contents c
+WHERE c.status = 'approved'
+  AND NOT EXISTS (
+    SELECT 1 FROM content_publications p
+    WHERE p.content_id = c.id AND p.role = 'primary' AND p.publish_status = 'published'
+  );
 
 -- 9. Historical performance for one content item
 SELECT * FROM content_metrics WHERE content_id = $1 ORDER BY collected_at;
@@ -609,6 +704,22 @@ SELECT * FROM content_insights ORDER BY created_at DESC LIMIT 20;
 
 -- 15. Dashboard pipeline view
 SELECT * FROM content_pipeline_overview ORDER BY status, published_at DESC NULLS LAST;
+
+-- 16. Content awaiting secondary (SNS) distribution
+SELECT c.title, p.channel, p.distribution_status FROM content_publications p
+JOIN contents c ON c.id = p.content_id
+WHERE p.role = 'secondary' AND p.distribution_status = 'pending';
+
+-- 17. Which content/channel is generating qualified leads
+SELECT c.title, le.channel, count(*) FILTER (WHERE le.qualified) AS qualified_leads
+FROM lead_events le
+JOIN contents c ON c.id = le.content_id
+GROUP BY c.title, le.channel
+ORDER BY qualified_leads DESC;
+
+-- 18. Channel variants that came from the same idea/content family
+SELECT * FROM contents
+WHERE content_group_id = $1 OR id = $1;
 ```
 
 ## 12. Example Data
@@ -624,12 +735,13 @@ INSERT INTO channels (id, label) VALUES
     ('webinar', 'Offline Seminar / Webinar'),
     ('other', 'Other');
 
-INSERT INTO business_context (company_name, company_description, target_audience, tone_and_manner)
+INSERT INTO business_context (company_name, company_description, target_audience, tone_and_manner, tone_guide_version)
 VALUES (
     'Codepresso',
     'B2B provider of AI competency assessment, AI education, and AI transformation (AX) consulting for enterprises and public institutions.',
     'HR/L&D leaders and executives at large and mid-sized companies and public-sector organizations.',
-    'Confident but not hyped; practical and evidence-based; avoids generic "AI will change everything" marketing language.'
+    '실무 중심적 · 전문적이지만 이해하기 쉬운 · 근거 중심적 · 대화하듯 자연스러운 · 현실적이고 절제된 톤 유지. 과장 표현·상투적 AI 문장 금지. 고객사명·가격·계약조건·성과 수치는 검증된 자료가 있을 때만 사용. 공식 명칭은 임의 변경 금지.',
+    'tone-and-manner.md v1 (2026-08-24)'
 );
 
 INSERT INTO trends (title, summary, source, relevance_score, relevance_explanation, status, tags)
@@ -659,25 +771,39 @@ INSERT INTO idea_trends (idea_id, trend_id)
 SELECT i.id, t.id FROM ideas i, trends t LIMIT 1;
 
 WITH i AS (SELECT id FROM ideas LIMIT 1)
-INSERT INTO contents (idea_id, title, body, channel, status, published_at, published_url)
+INSERT INTO contents (idea_id, title, body, channel, status)
 SELECT
     i.id,
     'Why Your AI Training Budget Isn''t Producing AI-Fluent Teams',
     '# Why Your AI Training Budget Isn''t Producing AI-Fluent Teams\n\n...(markdown body)...',
     'linkedin',
-    'published',
-    now() - interval '10 days',
-    'https://linkedin.com/example-post'
+    'published'
 FROM i;
 
 INSERT INTO content_reviews (content_id, reviewer_name, review_status, quality_score, brand_fit_score, factual_risk, feedback, reviewed_at)
 SELECT id, 'Seojin', 'approved', 4, 5, 'none', 'Good enterprise framing, on-brand.', now() - interval '11 days'
 FROM contents LIMIT 1;
 
+-- Primary publish (Stage 5) and a secondary cross-post (Stage 6), both on content_publications.
+INSERT INTO content_publications (content_id, channel, role, publish_status, published_at, platform_url, distribution_status, distributed_at)
+SELECT id, 'linkedin', 'primary', 'published', now() - interval '10 days', 'https://linkedin.com/example-post', 'distributed', now() - interval '10 days'
+FROM contents LIMIT 1;
+INSERT INTO content_publications (content_id, channel, role, publish_status, distribution_status)
+SELECT id, 'newsletter', 'secondary', 'scheduled', 'pending'
+FROM contents LIMIT 1;
+
 INSERT INTO content_metrics (content_id, views, clicks, leads, collected_at)
 SELECT id, 1200, 85, 2, now() - interval '9 days' FROM contents LIMIT 1;
 INSERT INTO content_metrics (content_id, views, clicks, leads, collected_at)
 SELECT id, 4300, 210, 7, now() - interval '2 days' FROM contents LIMIT 1;
+
+-- Individual inquiries behind the "7 leads" aggregate above.
+INSERT INTO lead_events (content_id, channel, inquiry_type, qualified, attribution_source)
+SELECT id, 'linkedin', 'contact_form', true, 'utm_source=linkedin&utm_campaign=ai-training' FROM contents LIMIT 1;
+INSERT INTO lead_events (content_id, channel, inquiry_type, qualified, attribution_source)
+SELECT id, 'linkedin', 'demo_request', true, 'utm_source=linkedin&utm_campaign=ai-training' FROM contents LIMIT 1;
+INSERT INTO lead_events (content_id, channel, inquiry_type, qualified, attribution_source)
+SELECT id, 'newsletter', 'newsletter_signup', false, 'referral link in article' FROM contents LIMIT 1;
 
 WITH c AS (SELECT id FROM contents LIMIT 1)
 INSERT INTO content_insights (content_id, insight_type, insight_text, confidence)
@@ -721,21 +847,29 @@ LIMIT 1;
 - **`content_insights.content_id` is nullable and paired with `insight_sources`.** An insight is meant to generalize ("audience-level" or "topic-level" patterns), so it should survive even if one supporting content row is later archived or deleted; `content_id` is kept only as a convenience pointer to the primary example.
 - **`content_reviews` and `content_insights` are append-only** (no `updated_at`, no in-place edits). This preserves a full audit trail of review history and how understanding evolved over time, which matters more here than update convenience.
 - **UUID primary keys via `gen_random_uuid()` / `pgcrypto`.** UUIDs let the web UI, the three agents, and the collection/insight processes all generate valid, globally-unique IDs independently without round-tripping through the database first (useful once content generation happens in an agent process before the row is even inserted). `pgcrypto` is enabled explicitly so the script also runs unmodified on PostgreSQL versions before 13, where `gen_random_uuid()` is not yet built in.
+- **`lead_events` added after mentor review, alongside `content_metrics.leads`.** The challenge's real requirement is tracing *which content produced which inquiry*, not just a weekly total — a bare integer can't answer "was this a qualified B2B lead" or "which channel". `content_metrics.leads` stays as the fast aggregate for dashboards/reporting; `lead_events` is the itemized ledger it should reconcile with. Both are kept rather than only the event table, because historical data collected before this table existed may only have the aggregate.
+- **`content_publications` replaces `contents.published_at`/`published_url`.** Stage ⑤ (Upload) and ⑥ (SNS Distribution) were previously compressed into two columns on `contents`, which can't represent "published on the primary channel, then cross-posted to two more" or track a schedule/distribution status separately from the content's own review status. Moving this into its own table also avoids the exact "same fact tracked in two places" risk flagged in review — `contents` no longer carries any publish timestamp of its own.
+- **`content_group_id` as a single nullable self-referencing column, not a separate `content_groups` table.** One idea can spawn a blog post, a LinkedIn post, and a newsletter blurb — each needs its own `contents` row because the written body genuinely differs per channel, but the UI/agents still need to know they're siblings. A join table would be more "correct" relationally, but for an MVP a self-referencing pointer (siblings share the first row's `id`) is enough to group them without adding another table to reason about.
+- **Agent 1/2/3 reframed as Strategy / Content & Distribution / Measurement & Learning**, with Review/Risk Check pulled out as a cross-cutting gate (Section 8). The original split (Idea/Planning → Content Generation → Review/Optimization) left stages ⑤–⑧ without a clear owner in the architecture. This reframing changes documentation and read/write responsibility only — no new tables were needed, since the underlying data (`contents`, `content_publications`, `content_metrics`, `lead_events`, `content_insights`) already supported it.
+- **`business_context.tone_and_manner` holds a summary, not the full guide.** Ayoung owns `docs/tone-and-manner.md` as the canonical, detailed brand-voice document. Duplicating all ~9 sections into a database column would create two sources of truth that can silently diverge. Instead the column holds a short prompt-ready summary plus `tone_guide_version`, so agents get something they can use directly without a filesystem read, while the detailed rules stay maintained in one place.
 
 ## 14. MVP Scope vs Future Extensions
 
 **In scope for the MVP (this schema):**
 - Business context, trends, ideas, content, review/approval, metrics, insights, and the junction tables connecting them.
-- Simple single-version "current" business context.
+- Per-inquiry lead attribution (`lead_events`) alongside aggregate metrics (`content_metrics.leads`).
+- Itemized publish/distribution tracking (`content_publications`) merging Stages ⑤+⑥.
+- Lightweight cross-channel content grouping (`content_group_id`).
+- Simple single-version "current" business context, with a short tone-and-manner summary pointing at the canonical `docs/tone-and-manner.md`.
 - Reference-table channels.
 - Time-series metrics with a generated conversion-rate column.
 
 **Explicitly deferred to future iterations (do not build now):**
 - User accounts / authentication / role-based permissions.
-- Deep per-platform integrations (real YouTube Analytics API, LinkedIn API, ESP webhook ingestion) — the MVP assumes metrics arrive via manual entry or a simple import script into `content_metrics`.
+- Deep per-platform integrations (real YouTube Analytics API, LinkedIn API, ESP webhook ingestion, real lead-capture-form webhooks) — the MVP assumes `content_metrics` and `lead_events` are populated via manual entry or a simple import script.
 - Automated publishing (real posting to channels) — Section 5 of `CLAUDE.md` requires any mocked publish action to be clearly labeled as mocked, never presented as real.
-- Campcampaign-level grouping / A/B testing structures.
-- Advanced multi-touch attribution (currently, leads are attributed to a single content item; multi-content attribution is out of scope).
+- Full campaign-level grouping / A/B testing structures (`content_group_id` is a lightweight sibling pointer, not a campaign management system).
+- Advanced multi-touch attribution (`lead_events` attributes each inquiry to one content item; multi-content or multi-channel attribution is out of scope).
 - Vector search / embeddings for semantic content or trend search.
 - Automated news/trend ingestion pipelines (the MVP assumes `trends` rows can be inserted manually or by a simple script).
 - Detailed audit logging beyond the append-only review/insight history already built in.
