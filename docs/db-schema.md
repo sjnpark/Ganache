@@ -87,6 +87,7 @@ PostgreSQL sits in the middle of every arrow. No agent keeps its own private cop
 | `trends` | External news/issues/trends collected as planning input |
 | `ideas` | Content ideas proposed by Agent 1 |
 | `idea_trends` | Many-to-many: which trends informed which idea |
+| `planning_sessions` | One row per weekly planning meeting — pasted transcript + AI-generated summary |
 | `contents` | The central content entity (draft → review → approved → published); `content_group_id` links channel variants of the same idea |
 | `content_trends` | Many-to-many: which trends a piece of content directly references |
 | `content_reviews` | Human review/approval events for a content item (cross-cutting quality gate) |
@@ -126,6 +127,15 @@ erDiagram
         text title
         text status
         text recommended_channel FK
+        uuid planning_session_id FK
+    }
+
+    planning_sessions {
+        uuid id PK
+        date week_of
+        text transcript
+        text summary
+        timestamptz created_at
     }
 
     contents {
@@ -204,6 +214,7 @@ erDiagram
     channels ||--o{ lead_events : "channel"
     ideas ||--o{ contents : "becomes"
     ideas ||--o{ idea_trends : "informed by"
+    planning_sessions ||--o{ ideas : "decided in"
     trends ||--o{ idea_trends : "informs"
     contents ||--o{ content_trends : "references"
     trends ||--o{ content_trends : "referenced by"
@@ -235,7 +246,10 @@ A tiny seeded reference table (`blog_kr`, `blog_en`, `linkedin`, `youtube`, `new
 External issues/news/trends collected as raw planning input for Agent 1. Not a news archive — only fields needed to judge relevance and trace it into an idea.
 
 ### `ideas`
-Content ideas, each optionally traceable back to the trends and insights that produced it, and forward to the content it became.
+Content ideas, each optionally traceable back to the trends and insights that produced it, and forward to the content it became. `planning_session_id` (nullable) records which weekly planning meeting the idea was decided/selected in, if any — ideas can also be proposed by Agent 1 outside of a meeting.
+
+### `planning_sessions`
+One row per weekly planning meeting. `transcript` holds the raw meeting text (pasted in, not transcribed by this system), `summary` holds the AI-generated structured summary (topics discussed, channels, schedule decided). This directly answers the Stage ② pain point that "meeting decisions are not consistently documented" — the summary is what turns a verbal Monday meeting into reusable, queryable data. Kept as free text rather than rigid columns (topics/channels/schedule vary meeting to meeting) — an MVP tradeoff, same reasoning as `business_context.tone_and_manner`.
 
 ### `contents`
 The central pipeline entity. Tracks lifecycle status, which idea it came from, and which channel it targets. Publishing/distribution metadata now lives in `content_publications` (see below), not on this table.
@@ -264,6 +278,7 @@ Pure many-to-many junction tables. These are what make "performance → insight 
 
 - `channels (1) ── (N) contents`, `channels (1) ── (N) ideas` — restrict/nullable respectively (Section 9).
 - `ideas (1) ── (N) contents` — one idea can spawn multiple content pieces (e.g. a blog post *and* a LinkedIn post from the same idea).
+- `planning_sessions (1) ── (N) ideas` — a weekly meeting can decide/select multiple ideas; an idea may also exist with no meeting behind it.
 - `ideas (N) ── (N) trends` via `idea_trends` — an idea can be informed by multiple trends; a trend can seed multiple ideas.
 - `contents (N) ── (N) trends` via `content_trends` — for content that cites a trend directly, independent of which idea it came from.
 - `contents (1) ── (N) contents` via `content_group_id` — self-referencing; groups channel variants (blog/LinkedIn/newsletter) written from the same idea.
@@ -279,8 +294,8 @@ Pure many-to-many junction tables. These are what make "performance → insight 
 This was revised from an earlier draft where "Agent 3 = Review/Optimization" left stages ⑤–⑧ unclear about who does what. Review/approval is reframed as a **cross-cutting gate** rather than one agent's job, matching how the team actually splits work.
 
 **Agent 1 — Strategy (stages ① Idea + ② Planning)**
-- READ: `business_context` (current), `trends`, `contents` (past), `content_latest_metrics`, `content_insights`
-- WRITE: `ideas`, `idea_trends`, `idea_insights`
+- READ: `business_context` (current), `trends`, `contents` (past), `content_latest_metrics`, `content_insights`, `planning_sessions` (recent)
+- WRITE: `ideas`, `idea_trends`, `idea_insights`, `planning_sessions`
 
 **Agent 2 — Content & Distribution (stages ③ Writing, ④ Editing, ⑤ Publishing, ⑥ SNS Distribution)**
 - READ: `business_context` (current), `ideas` (selected), `trends`, `contents` (past, for style/precedent), `content_insights`
@@ -378,10 +393,22 @@ CREATE TRIGGER trends_set_updated_at
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- =========================================================
+-- planning_sessions
+-- =========================================================
+CREATE TABLE planning_sessions (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    week_of      DATE NOT NULL,
+    transcript   TEXT,
+    summary      TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- =========================================================
 -- ideas
 -- =========================================================
 CREATE TABLE ideas (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    planning_session_id UUID REFERENCES planning_sessions(id) ON DELETE SET NULL,
     title               TEXT NOT NULL,
     description         TEXT,
     rationale           TEXT,
@@ -583,6 +610,10 @@ CREATE INDEX idx_trends_tags         ON trends USING GIN (tags);
 
 -- ideas
 CREATE INDEX idx_ideas_status ON ideas (status);
+CREATE INDEX idx_ideas_planning_session_id ON ideas (planning_session_id);
+
+-- planning_sessions
+CREATE INDEX idx_planning_sessions_week_of ON planning_sessions (week_of DESC);
 
 -- junction tables: reverse-lookup side
 CREATE INDEX idx_idea_trends_trend_id       ON idea_trends (trend_id);
