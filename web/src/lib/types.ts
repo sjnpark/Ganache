@@ -55,3 +55,32 @@ export type LeadEventRow = {
   attribution_source: string | null;
   created_at: string;
 };
+
+// --- Stage 8: Data Accumulation / Insight (read-only overview) ---
+
+export type ContentInsightRow = {
+  id: string;
+  content_id: string | null;
+  content_title: string | null;
+  insight_type: string;
+  insight_text: string;
+  confidence: number | null;
+  created_at: string;
+};
+
+export type ContentPerformanceSummaryRow = {
+  content_id: string;
+  content_title: string;
+  channel: string;
+  views: number;
+  clicks: number | null;
+  qualified_leads: number;
+  total_leads: number;
+};
+
+export type ChannelLeadSummaryRow = {
+  channel: string;
+  qualified_leads: number;
+  total_leads: number;
+  views: number;
+};
