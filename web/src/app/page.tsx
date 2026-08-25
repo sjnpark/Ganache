@@ -1,4 +1,5 @@
 import { getDashboardData } from "@/lib/dashboard-data";
+import { Card, EmptyState, NavBar } from "@/components/ui";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "초안",
@@ -9,41 +10,19 @@ const STATUS_LABEL: Record<string, string> = {
   archived: "보관됨",
 };
 
-function EmptyState({ message }: { message: string }) {
-  return (
-    <p className="text-sm text-neutral-500 dark:text-neutral-400 italic">
-      {message}
-    </p>
-  );
-}
-
-function Card({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 flex flex-col gap-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
 export default async function Home() {
   const { trends, pipeline, topPerforming } = await getDashboardData();
 
   return (
     <main className="flex-1 mx-auto w-full max-w-6xl px-6 py-10 flex flex-col gap-8">
-      <header>
-        <h1 className="text-2xl font-bold">Ganache</h1>
-        <p className="text-neutral-500 dark:text-neutral-400">
-          Codepresso 마케팅 자동화 — 시작 화면
-        </p>
+      <header className="flex flex-col gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Ganache</h1>
+          <p className="text-neutral-500 dark:text-neutral-400">
+            Codepresso 마케팅 자동화 — 시작 화면
+          </p>
+        </div>
+        <NavBar />
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

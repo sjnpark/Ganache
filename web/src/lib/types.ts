@@ -18,6 +18,27 @@ export type Trend = {
   tags: string[];
 };
 
+export type Idea = {
+  id: string;
+  title: string;
+  description: string | null;
+  rationale: string | null;
+  target_audience: string | null;
+  recommended_channel: string | null;
+  marketing_goal: string | null;
+  status: string;
+  planning_session_id: string | null;
+  created_at: string;
+};
+
+export type PlanningSession = {
+  id: string;
+  week_of: string;
+  transcript: string | null;
+  summary: string | null;
+  created_at: string;
+};
+
 export type ContentPipelineRow = {
   id: string;
   title: string;
