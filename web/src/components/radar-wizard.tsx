@@ -93,6 +93,19 @@ function briefToPlainText(brief: OpportunityBrief): string {
     `## 추천 채널`,
     `${brief.recommended_channel.channel} — ${brief.recommended_channel.reason}`,
     ``,
+    // Search strategy is co-equal to the channel recommendation in the brief,
+    // so the handoff copy must carry it too. Optional on the type, so guard.
+    ...(brief.search_strategy
+      ? [
+          `## 검색 / 키워드 전략`,
+          `추천 키워드: ${brief.search_strategy.recommended_keywords.join(", ")}`,
+          `제목 방향: ${brief.search_strategy.seo_title_direction}`,
+          `소제목(H2/H3) 키워드: ${brief.search_strategy.subheading_keywords.join(", ")}`,
+          `검색 의도: ${brief.search_strategy.target_search_intent}`,
+          `의사결정자 적합성: ${brief.search_strategy.decision_maker_fit}`,
+          ``,
+        ]
+      : []),
     `## 콘텐츠 앵글`,
     brief.main_content_angle,
     ``,
