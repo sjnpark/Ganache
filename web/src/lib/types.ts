@@ -127,3 +127,31 @@ export type ChannelLeadSummaryRow = {
   total_leads: number;
   views: number;
 };
+
+// --- Opportunity Candidate (read-only, computed in application logic — NOT
+// a DB table, and NOT derived from `ideas`). Combines one external trend
+// signal with matching internal evidence. See CLAUDE.md Section 3.1: an
+// Opportunity is distinct from a Content Idea. ---
+
+export type OpportunitySignal = {
+  trend_id: string;
+  trend_title: string;
+  relevance_score: number | null;
+  tags: string[];
+};
+
+export type OpportunityEvidenceItem = {
+  content_id: string;
+  content_title: string;
+  channel: string;
+  qualified_leads: number;
+  matched_via: "insight" | "title";
+  insight_text: string | null;
+};
+
+export type OpportunityCandidate = {
+  signal: OpportunitySignal;
+  matchedTags: string[];
+  evidence: OpportunityEvidenceItem[];
+  hasInternalEvidence: boolean;
+};

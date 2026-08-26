@@ -3,6 +3,9 @@ import type {
   ChannelLeadSummaryRow,
   ContentInsightRow,
   ContentPerformanceSummaryRow,
+  OpportunityCandidate,
+  OpportunityEvidenceItem,
+  Trend,
 } from "./types";
 
 export type InsightsOverview = {
@@ -13,18 +16,22 @@ export type InsightsOverview = {
   totalClicks: number;
   byContent: ContentPerformanceSummaryRow[];
   byChannel: ChannelLeadSummaryRow[];
+  trends: Trend[];
+  opportunities: OpportunityCandidate[];
 };
 
-// Read-only aggregation for the Stage 8 Insight Overview screen. This does
-// NOT write anything — it only reads content_insights, contents,
-// content_latest_metrics, and lead_events, then combines them in memory so a
-// human can see why a content/channel looks like it's working, using
-// lead_events.qualified = true as the ground truth for "real B2B lead"
-// (never content_metrics.leads or raw views).
+// Read-only aggregation for the Stage 8 Insight / Opportunity Overview
+// screen. This does NOT write anything — it only reads content_insights,
+// contents, content_latest_metrics, lead_events, and trends, then combines
+// them in memory. lead_events.qualified = true is the ground truth for
+// "real B2B lead" everywhere (never content_metrics.leads, views, clicks,
+// or trend relevance_score). This does NOT read or write `ideas` — an
+// Opportunity Candidate here is a computed pairing of one external trend
+// with matching internal evidence, not a database row.
 export async function getInsightsOverview(): Promise<InsightsOverview> {
   const supabase = createSupabaseServerClient();
 
-  const [insightsRes, contentsRes, metricsRes, leadsRes] = await Promise.all([
+  const [insightsRes, contentsRes, metricsRes, leadsRes, trendsRes] = await Promise.all([
     supabase
       .from("content_insights")
       .select("id, content_id, insight_type, insight_text, confidence, created_at")
@@ -32,16 +39,22 @@ export async function getInsightsOverview(): Promise<InsightsOverview> {
     supabase.from("contents").select("id, title, channel"),
     supabase.from("content_latest_metrics").select("content_id, views, clicks"),
     supabase.from("lead_events").select("content_id, channel, qualified"),
+    supabase
+      .from("trends")
+      .select("id, title, summary, source, relevance_score, status, collected_at, tags")
+      .order("collected_at", { ascending: false }),
   ]);
 
   if (insightsRes.error) throw insightsRes.error;
   if (contentsRes.error) throw contentsRes.error;
   if (metricsRes.error) throw metricsRes.error;
   if (leadsRes.error) throw leadsRes.error;
+  if (trendsRes.error) throw trendsRes.error;
 
   const contents = contentsRes.data ?? [];
   const metrics = metricsRes.data ?? [];
   const leads = leadsRes.data ?? [];
+  const trends = (trendsRes.data ?? []) as Trend[];
 
   const contentById = new Map(contents.map((c) => [c.id, c]));
 
@@ -115,6 +128,8 @@ export async function getInsightsOverview(): Promise<InsightsOverview> {
     }))
     .sort((a, b) => b.qualified_leads - a.qualified_leads);
 
+  const opportunities = computeOpportunityCandidates(trends, insights, byContent);
+
   return {
     insights,
     qualifiedLeadCount,
@@ -123,5 +138,110 @@ export async function getInsightsOverview(): Promise<InsightsOverview> {
     totalClicks,
     byContent,
     byChannel,
+    trends,
+    opportunities,
   };
+}
+
+// Matches whole word `word` inside `text`, case-insensitively. Uses
+// non-alphanumeric boundaries instead of \b so it behaves correctly even
+// when `text` mixes ASCII tag words with Korean content titles.
+function containsWord(text: string, word: string): boolean {
+  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+  return pattern.test(text);
+}
+
+// Conservative, deterministic trend <-> internal-evidence matching.
+//
+// Safeguards (per team decision):
+// - Only trend.tags are used as the matching signal (never trend.title or
+//   trend.summary, which are far too free-text/generic).
+// - A tag must be "discriminating": unique to a single trend in the current
+//   trends table. A tag shared by multiple trends (e.g. a generic
+//   market/region tag) carries no distinguishing information and is
+//   dropped.
+// - A tag must be compound (2+ hyphen-separated words). A single generic
+//   word such as "ai", "enterprise", or "training" is NEVER enough by
+//   itself to create a match — only when ALL of a tag's words are present
+//   together (as whole words) in a piece of internal evidence.
+// - Evidence's qualified_leads always comes from lead_events.qualified =
+//   true via the linked content (byContent) — never from views, clicks,
+//   trend relevance_score, or any other attention/virality figure.
+// - If nothing passes these checks, the trend is still returned with
+//   hasInternalEvidence = false rather than being hidden or force-matched.
+function computeOpportunityCandidates(
+  trends: Trend[],
+  insights: ContentInsightRow[],
+  byContent: ContentPerformanceSummaryRow[]
+): OpportunityCandidate[] {
+  const tagFrequency = new Map<string, number>();
+  for (const t of trends) {
+    for (const tag of t.tags) {
+      tagFrequency.set(tag, (tagFrequency.get(tag) ?? 0) + 1);
+    }
+  }
+
+  return trends.map((trend) => {
+    const usableTags = trend.tags.filter((tag) => {
+      const isDiscriminating = (tagFrequency.get(tag) ?? 0) === 1;
+      const wordCount = tag.split("-").filter(Boolean).length;
+      return isDiscriminating && wordCount >= 2;
+    });
+
+    const matchedTags = new Set<string>();
+    const evidenceByContentId = new Map<string, OpportunityEvidenceItem>();
+
+    for (const tag of usableTags) {
+      const words = tag.toLowerCase().split("-").filter(Boolean);
+
+      for (const insight of insights) {
+        if (!words.every((w) => containsWord(insight.insight_text, w))) continue;
+        matchedTags.add(tag);
+        if (!insight.content_id) continue;
+        const backing = byContent.find((c) => c.content_id === insight.content_id);
+        if (backing && !evidenceByContentId.has(backing.content_id)) {
+          evidenceByContentId.set(backing.content_id, {
+            content_id: backing.content_id,
+            content_title: backing.content_title,
+            channel: backing.channel,
+            qualified_leads: backing.qualified_leads,
+            matched_via: "insight",
+            insight_text: insight.insight_text,
+          });
+        }
+      }
+
+      for (const c of byContent) {
+        if (!words.every((w) => containsWord(c.content_title, w))) continue;
+        matchedTags.add(tag);
+        if (!evidenceByContentId.has(c.content_id)) {
+          evidenceByContentId.set(c.content_id, {
+            content_id: c.content_id,
+            content_title: c.content_title,
+            channel: c.channel,
+            qualified_leads: c.qualified_leads,
+            matched_via: "title",
+            insight_text: null,
+          });
+        }
+      }
+    }
+
+    const evidence = Array.from(evidenceByContentId.values()).sort(
+      (a, b) => b.qualified_leads - a.qualified_leads
+    );
+
+    return {
+      signal: {
+        trend_id: trend.id,
+        trend_title: trend.title,
+        relevance_score: trend.relevance_score,
+        tags: trend.tags,
+      },
+      matchedTags: Array.from(matchedTags),
+      evidence,
+      hasInternalEvidence: evidence.length > 0,
+    };
+  });
 }
