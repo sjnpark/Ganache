@@ -2,6 +2,10 @@ import { getRadar } from "@/lib/radar-agent";
 import { NavBar } from "@/components/ui";
 import { RadarWizard } from "@/components/radar-wizard";
 
+// Read live from Supabase on every request. Without this the page is
+// prerendered at build time and would serve stale signals after deploy.
+export const dynamic = "force-dynamic";
+
 export default async function RadarPage() {
   const { companyContext, signals } = await getRadar();
 
