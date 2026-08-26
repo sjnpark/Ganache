@@ -82,19 +82,34 @@ export type OpportunityBriefAlternativeChannel = {
   suggested_format_or_angle: string;
 };
 
-// Evidence-strength tiers, strongest first — see CLAUDE.md 3.1 governing
-// principles: qualified inquiry data is the ground truth; attention
-// metrics (views/clicks/likes) are never proof of B2B conversion.
+// Evidence strength = how strong the supporting Codepresso evidence for
+// this Opportunity is. Kept identical to Yeonwoo's canonical hierarchy
+// (origin/yeonwoo evidence-strength taxonomy) so the two modules share one
+// vocabulary instead of drifting into different names for the same idea.
+// Not currently assigned to a field in this module (nothing here grades
+// evidence strength yet) — exported for that shared vocabulary, and so a
+// future field (here or in Yeonwoo's module) can use it without a rename.
 export type EvidenceTier =
-  | "downstream_business_outcome" // contract / additional training / upsell / account expansion
-  | "qualified_inquiry" // lead_events.qualified = true — strongest evidence usually available
-  | "strong_engagement" // actual workshop/webinar attendance, repeat participation
-  | "conversion_action" // workshop/webinar registration, CTA submission
-  | "attention_metric"; // views / clicks / likes — attention only, NOT proof of conversion
+  | "downstream_business_outcome"
+  | "qualified_b2b_inquiry"
+  | "strong_engagement_outcome"
+  | "conversion_action"
+  | "attention_only";
+
+// Success metric = what we should measure going forward if we act on this
+// Opportunity. This is a DIFFERENT axis from EvidenceTier (which grades
+// evidence we already have) — do not merge the two back together.
+export type SuccessMetricCategory =
+  | "qualified_b2b_inquiry"
+  | "enterprise_inquiry"
+  | "organic_search_traffic"
+  | "search_visibility"
+  | "conversion_action"
+  | "attention_metric";
 
 export type OpportunityBriefSuccessMetric = {
   metric: string;
-  tier: EvidenceTier;
+  category: SuccessMetricCategory;
   rationale: string;
 };
 
@@ -104,12 +119,28 @@ export type OpportunityBriefSource = {
   detail: string | null;
 };
 
+// Search / keyword strategy — added because ~70-80% of Codepresso's
+// inbound currently comes through Google/Naver search, so keyword and
+// title/subheading choices matter as much as channel choice. Never carries
+// invented search volume, SEO score, or ranking numbers (nothing here is
+// backed by real search data).
+export type OpportunityBriefSearchStrategy = {
+  recommended_keywords: string[]; // ideally 3-5, grounded only in the supplied signal + business context
+  seo_title_direction: string; // a direction or 1-2 examples, not a finished article title
+  subheading_keywords: string[]; // key terms that should appear in H2/H3-style subheadings
+  target_search_intent: string; // what the enterprise decision-maker is trying to learn/solve
+  decision_maker_fit: string; // why this matters to Codepresso's senior enterprise audience
+};
+
 export type OpportunityBrief = {
   opportunity_title: string;
   why_now: string;
   recommended_target_audience: string;
   recommended_channel: OpportunityBriefChannelRecommendation;
   alternative_channels: OpportunityBriefAlternativeChannel[];
+  // Optional so existing callers/mock data built before this field existed
+  // keep compiling without changes (safer for Seojin's integration).
+  search_strategy?: OpportunityBriefSearchStrategy;
   main_content_angle: string;
   talking_points: string[];
   recommended_marketing_action: string;
