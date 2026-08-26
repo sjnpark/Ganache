@@ -310,7 +310,7 @@ export function RadarWizard({
         ) : !brief ? (
           <p className="text-sm text-neutral-500 dark:text-neutral-400">
             {pending
-              ? "Brief를 생성하는 중이에요... (몇 초 걸려요)"
+              ? "Opportunity Brief를 생성하고 있어요. 분석에 잠시 시간이 걸릴 수 있습니다."
               : "위 버튼을 눌러 Brief를 생성하세요."}
           </p>
         ) : (
