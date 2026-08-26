@@ -3,14 +3,18 @@
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import type {
-  EvidenceTier,
   OpportunityBrief,
+  SuccessMetricCategory,
 } from "@/lib/opportunity-brief-types";
 
-const TIER_LABEL: Record<EvidenceTier, string> = {
-  downstream_business_outcome: "다운스트림 비즈니스 성과 (계약/업셀)",
-  qualified_inquiry: "Qualified B2B 문의",
-  strong_engagement: "실제 참석 / 재참여",
+// Labels for SuccessMetricCategory — what to measure going forward, NOT
+// how strong current evidence is (that's EvidenceTier, a separate concept
+// this component doesn't need to render).
+const SUCCESS_METRIC_CATEGORY_LABEL: Record<SuccessMetricCategory, string> = {
+  qualified_b2b_inquiry: "Qualified B2B 문의",
+  enterprise_inquiry: "엔터프라이즈 문의",
+  organic_search_traffic: "오가닉 검색 유입",
+  search_visibility: "검색 노출 / 순위",
   conversion_action: "등록 / CTA 제출",
   attention_metric: "주목도 지표 (참고용)",
 };
@@ -83,7 +87,11 @@ export function OpportunityBriefCard({
           {brief.recommended_target_audience}
         </p>
 
-        <div className="rounded-md border border-neutral-900 dark:border-white px-3 py-2.5">
+        {/* Channel and Search/Keyword strategy are peer sections — neither
+            should visually dominate the other (Codepresso's inbound is
+            70-80% search-driven, so keyword strategy matters as much as
+            channel choice). Both use the same neutral highlight styling. */}
+        <div className="rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 px-3 py-2.5">
           <p className="font-medium">
             ⭐ 추천 채널: {brief.recommended_channel.label}
           </p>
@@ -91,6 +99,65 @@ export function OpportunityBriefCard({
             {brief.recommended_channel.reason}
           </p>
         </div>
+
+        {brief.search_strategy && (
+          <div className="rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 px-3 py-2.5">
+            <p className="font-medium">🔍 검색/키워드 전략</p>
+            <div className="mt-2 flex flex-col gap-2">
+              {brief.search_strategy.recommended_keywords.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                    추천 키워드
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {brief.search_strategy.recommended_keywords.map((kw, i) => (
+                      <span
+                        key={i}
+                        className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300"
+                      >
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {brief.search_strategy.seo_title_direction && (
+                <p className="text-neutral-600 dark:text-neutral-300">
+                  <span className="font-medium text-neutral-800 dark:text-neutral-100">
+                    제목 방향:{" "}
+                  </span>
+                  {brief.search_strategy.seo_title_direction}
+                </p>
+              )}
+              {brief.search_strategy.subheading_keywords.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                    소제목(H2/H3) 키워드
+                  </p>
+                  <p className="text-neutral-600 dark:text-neutral-300">
+                    {brief.search_strategy.subheading_keywords.join(" · ")}
+                  </p>
+                </div>
+              )}
+              {brief.search_strategy.target_search_intent && (
+                <p className="text-neutral-600 dark:text-neutral-300">
+                  <span className="font-medium text-neutral-800 dark:text-neutral-100">
+                    검색 의도:{" "}
+                  </span>
+                  {brief.search_strategy.target_search_intent}
+                </p>
+              )}
+              {brief.search_strategy.decision_maker_fit && (
+                <p className="text-neutral-600 dark:text-neutral-300">
+                  <span className="font-medium text-neutral-800 dark:text-neutral-100">
+                    의사결정자 적합성:{" "}
+                  </span>
+                  {brief.search_strategy.decision_maker_fit}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {brief.alternative_channels.length > 0 && (
           <div>
@@ -151,7 +218,7 @@ export function OpportunityBriefCard({
               {brief.success_metrics.map((m, i) => (
                 <li key={i} className="text-neutral-600 dark:text-neutral-300">
                   <span className="inline-block text-xs px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 mr-1.5">
-                    {TIER_LABEL[m.tier]}
+                    {SUCCESS_METRIC_CATEGORY_LABEL[m.category]}
                   </span>
                   <span className="font-medium text-neutral-800 dark:text-neutral-100">
                     {m.metric}

@@ -1,15 +1,16 @@
 import { generateJson } from "./gemini";
 import {
   KNOWN_CHANNELS,
-  type EvidenceTier,
   type GenerateOpportunityBriefInput,
   type OpportunityBrief,
   type OpportunityBriefAlternativeChannel,
   type OpportunityBriefBusinessContext,
   type OpportunityBriefChannelRecommendation,
   type OpportunityBriefEvidenceItem,
+  type OpportunityBriefSearchStrategy,
   type OpportunityBriefSource,
   type OpportunitySignalInput,
+  type SuccessMetricCategory,
 } from "./opportunity-brief-types";
 
 // This module takes its inputs as plain arguments and never touches
@@ -19,10 +20,11 @@ import {
 // small, stable contract, so it can be dropped into Seojin's Radar wizard
 // or any other page without pulling in a DB dependency of its own.
 
-const VALID_TIERS: EvidenceTier[] = [
-  "downstream_business_outcome",
-  "qualified_inquiry",
-  "strong_engagement",
+const VALID_SUCCESS_METRIC_CATEGORIES: SuccessMetricCategory[] = [
+  "qualified_b2b_inquiry",
+  "enterprise_inquiry",
+  "organic_search_traffic",
+  "search_visibility",
   "conversion_action",
   "attention_metric",
 ];
@@ -41,10 +43,17 @@ type GeneratedBriefJudgment = {
     label: string;
     suggested_format_or_angle: string;
   }[];
+  search_strategy: {
+    recommended_keywords: string[];
+    seo_title_direction: string;
+    subheading_keywords: string[];
+    target_search_intent: string;
+    decision_maker_fit: string;
+  };
   main_content_angle: string;
   talking_points: string[];
   recommended_marketing_action: string;
-  success_metrics: { metric: string; tier: string; rationale: string }[];
+  success_metrics: { metric: string; category: string; rationale: string }[];
   confidence: number;
 };
 
@@ -92,28 +101,45 @@ const INSTRUCTION = `
 주어진 외부 시장/경쟁사 신호와 내부 증거를 바탕으로 "Opportunity Brief"를 작성하세요.
 
 이 Brief는 최종 원고가 아니라, 사람이 검토 후 진행 여부를 결정하는 전략 요약입니다.
-실제 글(블로그/LinkedIn 포스트 등)을 쓰지 마세요 — 채널, 각도, 핵심 메시지만 제안하면 됩니다.
+실제 글(블로그/LinkedIn 포스트 등)을 쓰지 마세요 — 채널, 검색 전략, 각도, 핵심 메시지만 제안하면 됩니다.
 
-규칙:
+[채널 추천]
 - recommended_channel의 channel 값은 반드시 다음 중 하나여야 합니다: ${KNOWN_CHANNELS.join(", ")}
 - 가장 적합한 채널 1개만 recommended_channel로 선정하고, 왜 그 채널인지 reason에 구체적으로 설명하세요.
 - alternative_channels에는 recommended_channel과 다른 채널 중 실제로 쓸만한 것 2~4개를 제시하고, 각각 짧은 suggested_format_or_angle을 붙이세요. channel 값도 위 목록 중에서만 고르세요.
+
+[검색/키워드 전략] — Codepresso 인바운드의 70~80%가 검색(구글/네이버)에서 발생하므로, 채널 추천만큼 중요하게 다루세요.
+- recommended_keywords는 3~5개, 오직 주어진 시장 신호와 Codepresso 비즈니스 컨텍스트에 근거해서만 제안하세요. 검색량 숫자, SEO 점수, 순위는 절대 만들어내지 마세요.
+- seo_title_direction은 완성된 최종 기사 제목이 아니라, 제목이 잡아야 할 방향성 또는 예시 1~2개면 충분합니다.
+- subheading_keywords에는 본문 소제목(H2/H3)에 들어가야 할 핵심 용어를 제시하세요.
+- target_search_intent에는 이 주제를 검색하는 엔터프라이즈 의사결정자가 실제로 알고 싶어하거나 해결하고 싶어하는 것을 쓰세요.
+- decision_maker_fit에는 이 주제/메시지가 왜 Codepresso의 시니어 엔터프라이즈 독자(팀장/임원/C-Level)에게 적합한지 쓰세요.
+- 경쟁사가 특정 키워드에서 실제로 랭킹하고 있다는 근거가 주어지지 않았다면, 경쟁사가 그 키워드를 장악하고 있다고 주장하지 마세요.
+
+[핵심 talking points]
 - talking_points는 정확히 2~3개만.
-- success_metrics를 정할 때 반드시 다음 우선순위를 따르세요 (내부 증거로 뒷받침되는 것 중 가장 강한 것을 우선하되, 억지로 끌어올리지 마세요):
-  1. downstream_business_outcome — 계약/추가 교육/업셀/계정 확장
-  2. qualified_inquiry — Qualified B2B 문의 (현재 확보 가능한 가장 강력한 지표인 경우가 많음)
-  3. strong_engagement — 실제 워크숍/웨비나 참석, 재참여
-  4. conversion_action — 워크숍/웨비나 등록, CTA 제출
-  5. attention_metric — 조회수/클릭/좋아요 (주목도일 뿐 B2B 전환 증거 아님)
-  각 항목의 tier 값은 반드시 위 5개 영문 키워드 중 하나여야 합니다.
-- 제공된 내부 증거가 없으면 강한 지표(1~2번)를 절대 지어내지 말고, rationale에 "내부 증거 없음 — 검증 필요"라고 쓰세요.
-- 존재하지 않는 시장 사실, 성과 수치, 문의 건수, 워크숍 결과, 고객 사례, 출처를 지어내지 마세요. 제공된 정보에 없는 것은 언급하지 마세요.
+
+[성공 지표 제안]
+- success_metrics의 category 값은 반드시 다음 중 하나여야 합니다: qualified_b2b_inquiry, enterprise_inquiry, organic_search_traffic, search_visibility, conversion_action, attention_metric
+- 이 category는 "지금까지의 증거가 얼마나 강한가"가 아니라 "이 기회를 실행하면 앞으로 무엇을 측정해야 하는가"를 나타냅니다. 아래 우선순위를 따르되, 내부 증거가 뒷받침하지 않는 지표를 억지로 끌어올리지 마세요:
+  1. qualified_b2b_inquiry / enterprise_inquiry — 최종 목표는 결국 실제 B2B 문의로 이어지는지 여부입니다
+  2. organic_search_traffic — 검색을 통한 유입
+  3. search_visibility — 검색 노출/순위 (실측 데이터가 있을 때만 의미 있음)
+  4. conversion_action — 등록, CTA 제출
+  5. attention_metric — 조회수/클릭/좋아요 (참고용, B2B 전환 증거 아님)
+- 지표는 "실행하면 이걸 측정해봐야 한다"는 제안입니다. 이미 관측된 수치인 것처럼 쓰지 마세요 (예: "현재 검색 3위" 같은 표현 금지 — "검색 노출을 추적해볼 만함" 같은 제안형으로 쓰세요).
+- 제공된 내부 증거가 없으면 qualified_b2b_inquiry/enterprise_inquiry를 억지로 제안하지 말고, rationale에 "내부 증거 없음 — 검증 필요"라고 쓰세요.
+
+[사실 안전 규칙]
+- 존재하지 않는 시장 사실, 성과 수치, 문의 건수, 워크숍 결과, 고객 사례, 검색량, SEO 점수, 순위, 출처를 지어내지 마세요. 제공된 정보에 없는 것은 언급하지 마세요.
 - 경쟁사/시장의 조회수·좋아요·바이럴은 시장 관심 신호일 뿐입니다 — 문의나 매출을 만들었다고 주장하지 마세요.
+
+[기타]
 - recommended_marketing_action은 구체적인 CTA/액션으로 쓰세요 (예: "웨비나 등록 유도", "AI 역량진단 상담 신청 CTA 배치").
 - confidence는 0.0~1.0 사이 숫자로, 이 추천에 대한 확신도를 나타내세요.
 
 다음 JSON 형식으로만 응답하세요:
-{"opportunity_title": "...", "why_now": "...", "recommended_target_audience": "...", "recommended_channel": {"channel": "...", "label": "...", "reason": "..."}, "alternative_channels": [{"channel": "...", "label": "...", "suggested_format_or_angle": "..."}], "main_content_angle": "...", "talking_points": ["...", "..."], "recommended_marketing_action": "...", "success_metrics": [{"metric": "...", "tier": "...", "rationale": "..."}], "confidence": 0.0}
+{"opportunity_title": "...", "why_now": "...", "recommended_target_audience": "...", "recommended_channel": {"channel": "...", "label": "...", "reason": "..."}, "alternative_channels": [{"channel": "...", "label": "...", "suggested_format_or_angle": "..."}], "search_strategy": {"recommended_keywords": ["...", "..."], "seo_title_direction": "...", "subheading_keywords": ["...", "..."], "target_search_intent": "...", "decision_maker_fit": "..."}, "main_content_angle": "...", "talking_points": ["...", "..."], "recommended_marketing_action": "...", "success_metrics": [{"metric": "...", "category": "...", "rationale": "..."}], "confidence": 0.0}
 `.trim();
 
 function normalizeChannel(
@@ -142,14 +168,29 @@ function normalizeAlternatives(
 }
 
 function normalizeSuccessMetrics(
-  raw: { metric: string; tier: string; rationale: string }[] | undefined
+  raw: { metric: string; category: string; rationale: string }[] | undefined
 ) {
   if (!raw) return [];
   return raw.map((m) => ({
     metric: m.metric,
-    tier: (VALID_TIERS as string[]).includes(m.tier) ? (m.tier as EvidenceTier) : "attention_metric",
+    category: (VALID_SUCCESS_METRIC_CATEGORIES as string[]).includes(m.category)
+      ? (m.category as SuccessMetricCategory)
+      : "attention_metric",
     rationale: m.rationale ?? "",
   }));
+}
+
+function normalizeSearchStrategy(
+  raw: GeneratedBriefJudgment["search_strategy"] | undefined
+): OpportunityBriefSearchStrategy | undefined {
+  if (!raw) return undefined;
+  return {
+    recommended_keywords: (raw.recommended_keywords ?? []).slice(0, 5),
+    seo_title_direction: raw.seo_title_direction ?? "",
+    subheading_keywords: raw.subheading_keywords ?? [],
+    target_search_intent: raw.target_search_intent ?? "",
+    decision_maker_fit: raw.decision_maker_fit ?? "",
+  };
 }
 
 // Built entirely from the caller's input, never from the model — this is
@@ -197,6 +238,7 @@ ${businessContextText(input.businessContext)}
     recommended_target_audience: judgment.recommended_target_audience,
     recommended_channel: normalizeChannel(judgment.recommended_channel),
     alternative_channels: normalizeAlternatives(judgment.alternative_channels),
+    search_strategy: normalizeSearchStrategy(judgment.search_strategy),
     main_content_angle: judgment.main_content_angle,
     talking_points: (judgment.talking_points ?? []).slice(0, 3),
     recommended_marketing_action: judgment.recommended_marketing_action ?? "",
