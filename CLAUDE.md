@@ -95,7 +95,13 @@ What we are NOT building as the core MVP
 Governing principles
 
 * External views/likes/virality are market attention signals only — never proof of B2B conversion.
-* Qualified inquiry data (`lead_events.qualified = true`) is the internal business evidence — the real ground truth.
+* Internal business evidence exists on a hierarchy. Only cite what Codepresso actually provides for a given piece of evidence — never fabricate or assume a stronger tier than what was actually observed:
+  1. Downstream business outcome — e.g. contract, additional training engagement, upsell, account expansion. Strongest, when actually traceable.
+  2. Qualified B2B inquiry — `lead_events.qualified = true`. Our current strongest available commercial-intent evidence.
+  3. Strong engagement outcome — actual workshop/webinar attendance, repeat participation. Useful evidence, but not automatically equivalent to commercial conversion.
+  4. Conversion action — workshop/webinar registration, CTA submission, etc.
+  5. Attention metrics — views, clicks, likes. Attention only, never proof of B2B conversion.
+  We do not yet know what tier-1/tier-3 data (business outcomes, attendance, repeat participation) Codepresso can actually provide, so no speculative schema fields have been pre-built for them (Section 11: avoid destructive/speculative schema changes without team confirmation). Until such data is confirmed available, `lead_events.qualified = true` (tier 2) remains our current baseline business evidence. If stronger business-outcome data becomes available later, extend the schema minimally at that time.
 * "Opportunity" and "Content Idea" are distinct concepts: an Opportunity is a recommended direction backed by evidence; a Content Idea is the channel-specific execution of an approved Opportunity. Do not collapse the two.
 * Every recommendation (Opportunity or Content Idea) must show why it was made, with a traceable path back to its supporting external signal(s) and/or internal evidence.
 * Human approval remains required before an Opportunity or Content Idea moves forward — this pivot does not remove Section 6's human-in-the-loop principle.
@@ -108,7 +114,7 @@ A relevant Opportunity is presented as an Opportunity Brief. The human reviews, 
 
 * why this signal is relevant to Codepresso
 * external evidence / source (the market/competitor signal)
-* internal evidence, if available (qualified B2B inquiry / past content performance)
+* internal evidence, if available (see the evidence hierarchy in Governing principles above — cite the strongest tier Codepresso actually provides, never a fabricated stronger one)
 * relevance / confidence
 * recommended target audience
 * recommended channel
