@@ -136,6 +136,8 @@ export type ChannelLeadSummaryRow = {
 export type OpportunitySignal = {
   trend_id: string;
   trend_title: string;
+  summary: string | null;
+  source: string | null;
   relevance_score: number | null;
   tags: string[];
 };
@@ -149,9 +151,32 @@ export type OpportunityEvidenceItem = {
   insight_text: string | null;
 };
 
+// Business-evidence strength hierarchy — see CLAUDE.md Section 3.1
+// (Governing principles). Only "qualified_b2b_inquiry" and "attention_only"
+// are ever computed today, because Codepresso has not yet supplied
+// workshop-attendance, repeat-participation, or business-expansion data. Do
+// not fabricate the other tiers — they exist here only so this type is
+// forward-compatible once that data becomes available.
+export type EvidenceTier =
+  | "downstream_business_outcome"
+  | "qualified_b2b_inquiry"
+  | "strong_engagement_outcome"
+  | "conversion_action"
+  | "attention_only";
+
+export type ValidationState = "supported" | "partial_evidence" | "validation_needed";
+
 export type OpportunityCandidate = {
+  // Stable identifier for this MVP — always equal to signal.trend_id (one
+  // candidate per trend today). Not a new DB id/table.
+  id: string;
   signal: OpportunitySignal;
   matchedTags: string[];
   evidence: OpportunityEvidenceItem[];
   hasInternalEvidence: boolean;
+  evidence_tier: EvidenceTier | null;
+  validation_state: ValidationState;
+  // Deterministic, template-generated explanation — never LLM-generated,
+  // never invents facts beyond matchedTags/evidence.
+  rationale: string;
 };
