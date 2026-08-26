@@ -36,6 +36,9 @@ export function NavBar() {
       <Link href="/radar" className="hover:underline">
         Radar
       </Link>
+      <Link href="/insights" className="hover:underline">
+        근거
+      </Link>
       <Link href="/" className="hover:underline">
         대시보드
       </Link>

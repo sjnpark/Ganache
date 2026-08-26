@@ -54,6 +54,14 @@ export async function getRadar(): Promise<{
 }
 
 // ---------------------------------------------------------------------------
+// SUPERSEDED — kept for rollback only, NOT used by the production flow.
+//
+// Everything below (analyzeOpportunity, generateIdeasForOpportunity) predates
+// the pivot. The production Opportunity is now Yeonwoo's evidence-backed
+// OpportunityCandidate (lib/insights-data.ts), and content-idea drafting is
+// out of MVP scope per CLAUDE.md Section 3.1. `getRadar()` above IS still
+// used. Delete this section once the new end-to-end flow is verified.
+//
 // Step 2 — Opportunity: why this signal matters to THIS company, right now.
 // Deliberately not persisted (see the Opportunity type).
 // ---------------------------------------------------------------------------

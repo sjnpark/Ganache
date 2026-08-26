@@ -1,5 +1,10 @@
 import { getInsightsOverview } from "@/lib/insights-data";
 
+// Read live from Supabase on every request, matching the other data-backed
+// pages. Without this the page is prerendered at build time and would serve
+// stale evidence after deploy.
+export const dynamic = "force-dynamic";
+
 function EmptyState({ message }: { message: string }) {
   return (
     <p className="text-sm text-neutral-500 dark:text-neutral-400 italic">

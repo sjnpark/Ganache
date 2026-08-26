@@ -1,4 +1,4 @@
-import { getRadar } from "@/lib/radar-agent";
+import { getRadarPageData } from "@/lib/opportunity-flow";
 import { NavBar } from "@/components/ui";
 import { RadarWizard } from "@/components/radar-wizard";
 
@@ -7,7 +7,7 @@ import { RadarWizard } from "@/components/radar-wizard";
 export const dynamic = "force-dynamic";
 
 export default async function RadarPage() {
-  const { companyContext, signals } = await getRadar();
+  const { companyContext, signals, candidates } = await getRadarPageData();
 
   return (
     <main className="flex-1 mx-auto w-full max-w-3xl px-6 py-10 flex flex-col gap-8">
@@ -28,7 +28,7 @@ export default async function RadarPage() {
         </p>
       )}
 
-      <RadarWizard signals={signals} />
+      <RadarWizard signals={signals} candidates={candidates} />
     </main>
   );
 }
