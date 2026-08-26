@@ -77,11 +77,13 @@ Following mentor feedback, the team completed a pivot audit (2026-08-26) across 
 
 New Core MVP Loop
 External market / competitor signals
-+ Codepresso internal evidence (past content performance + qualified B2B inquiry evidence)
-→ Relevant Opportunity
++ Search / keyword opportunity
++ Codepresso internal business evidence (past content performance + qualified B2B inquiry evidence)
+→ Evidence-backed Opportunity
 → Opportunity Brief (this is the core product output — not a final draft)
+→ Human decision
 
-Actual article/post drafting is downstream, optional, and out of MVP scope (see 3.1.1). ChatGPT, Claude, or another existing writing tool can take an approved Opportunity Brief and produce the draft.
+Actual article/post drafting is downstream, optional, and out of MVP scope (see 3.1.1). ChatGPT, Claude, or another existing writing tool can take an approved Opportunity Brief and produce the draft. See Section 3.2 for the Codepresso-validated context (SEO/keyword priorities, decision-maker profile, acquisition focus) that now informs this loop.
 
 What we are NOT building as the core MVP
 
@@ -123,6 +125,50 @@ A relevant Opportunity is presented as an Opportunity Brief. The human reviews, 
 * traceable sources / evidence (both external and internal)
 
 Do not conflate an Opportunity Brief with a finished draft. Writing the actual article/post is explicitly out of MVP scope — an approved Brief can be handed to ChatGPT, Claude, or another writing tool downstream. Any existing draft-generation code may remain in the codebase as an optional/future feature, but no further MVP time should go into building or extending it.
+
+3.2 Codepresso-Validated Marketing Context (Executive Q&A, 2026-08-26)
+The following facts came directly from Q&A with Codepresso executives. This is validated business context, not assumptions, and should now guide product decisions alongside 3.1.
+
+Confirmed facts
+
+* Content marketing is a major current marketing channel for Codepresso.
+* Approximately 70–80% of inbound traffic currently comes from Google/Naver search.
+* Codepresso cares strongly about SEO/GEO performance, keyword choice, and how keywords are used in the main title and subheadings.
+* The goal is not only search visibility, but whether the content persuades a prospective enterprise customer to make an inquiry.
+* Codepresso tracks which content users came through before making inquiries.
+* Important keyword territories include: AI literacy, AI capability assessment, AI education / training.
+* Codepresso is open to receiving better keyword recommendations from our solution based on market and competitor research.
+* Their main enterprise decision-makers are senior people such as team leaders, executives, and C-level stakeholders, often 40+.
+* New enterprise customer acquisition and expansion within existing enterprise clients are both important, but new-customer acquisition currently deserves particular attention.
+* Singapore is especially focused on new-customer acquisition.
+* Content/training for non-developer roles is becoming more important.
+* A KBS News appearance was followed by a sharp increase in inbound inquiries.
+* A past SK hynix-related project reportedly performed well when using a "하이닉스 주가" keyword.
+* Codepresso executives validated our decision to focus narrowly on the 7 → 8 → 1 feedback loop (the Opportunity/Evidence direction in Section 3.1).
+
+Confirmed competitors (spelling verified with Codepresso)
+
+Domestic:
+
+* 팀스파르타 (스파르타코딩클럽) — enterprise AI education / AX education / AI competency assessment
+* 엘리스 (Elice) — enterprise AI/SW education / hands-on learning platform / competency assessment
+* 멋쟁이사자처럼 (LIKELION) — enterprise AI/AX and digital competency education
+
+Overseas (assessment-focused):
+
+* Codility — Technical Assessment / Coding Assessment
+* HackerRank — Developer Skills Assessment / Coding Test / Technical Interview
+
+Governing implications
+
+* Do not treat social virality as the primary success criterion.
+* Search visibility, keyword fit, senior decision-maker relevance, and qualified inquiry potential are more important than virality.
+* Never fabricate search volume, SEO ranking, inquiry numbers, or attribution.
+* Only use quantitative SEO/search metrics if Codepresso actually provides them — this follows the same "do not invent unavailable evidence" discipline as the business evidence hierarchy in 3.1.
+* Competitor news, blog topics, and keyword strategies from the companies above can be used as external market signals and keyword opportunity inputs.
+* For Korean SEO/search opportunities, prioritize the domestic competitors above.
+* For global/English search opportunities, also compare against Codility and HackerRank.
+* Do not treat competitor engagement or visibility as proof of competitor business conversion.
 
 4. Current Workflow and Pain Points
 Every implementation decision should remain grounded in these actual client problems.
