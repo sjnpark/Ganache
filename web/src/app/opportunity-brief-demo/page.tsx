@@ -44,16 +44,41 @@ const briefWithEvidence: OpportunityBrief = {
     "[MOCK] 진단 데이터가 있어야 교육 성과를 사후에 추적할 수 있다",
   ],
   recommended_marketing_action: "[MOCK] 'AI 역량진단 상담 신청' CTA를 본문 중간과 끝에 배치",
+  search_strategy: {
+    recommended_keywords: [
+      "[MOCK] AI 역량진단",
+      "[MOCK] 기업 AI 교육 로드맵",
+      "[MOCK] AX 전환 컨설팅",
+      "[MOCK] 조직 AI 역량 측정",
+    ],
+    seo_title_direction:
+      "[MOCK] 예시: 'AI 교육, 왜 역량진단부터 시작해야 하는가' — 문제 제기형 제목 방향",
+    subheading_keywords: [
+      "[MOCK] AI 역량진단이란",
+      "[MOCK] 역량진단 없는 교육의 한계",
+      "[MOCK] AX 로드맵 설계",
+    ],
+    target_search_intent:
+      "[MOCK] 우리 조직에 AI 교육을 도입하려는데 어디서부터 시작해야 할지, 기존 교육이 왜 효과가 없었는지 판단 기준을 찾고 있음",
+    decision_maker_fit:
+      "[MOCK] HRD 리더/임원이 예산 집행 전에 '이 접근이 다른 회사와 뭐가 다른가'를 검색으로 검증하는 단계에 정확히 맞는 주제",
+  },
   success_metrics: [
     {
       metric: "[MOCK] LinkedIn 게시물發 Qualified B2B 문의 수",
-      tier: "qualified_inquiry",
+      category: "qualified_b2b_inquiry",
       rationale:
         "[MOCK] 같은 주제의 과거 콘텐츠가 실제 qualified lead로 이어진 내부 증거가 있어, 이번에도 문의를 핵심 지표로 볼 수 있습니다.",
     },
     {
+      metric: "[MOCK] 추천 키워드 기반 오가닉 검색 유입 (추적 제안)",
+      category: "organic_search_traffic",
+      rationale:
+        "[MOCK] 아직 실측 검색 유입 데이터는 없음 — 게시 후 추적해볼 것을 제안하는 수준입니다.",
+    },
+    {
       metric: "[MOCK] 게시물 조회수/클릭 (참고용)",
-      tier: "attention_metric",
+      category: "attention_metric",
       rationale: "[MOCK] 주목도 확인용일 뿐, 그 자체로는 B2B 전환 증거가 아닙니다.",
     },
   ],
@@ -111,7 +136,7 @@ const briefWithoutEvidence: OpportunityBrief = {
   success_metrics: [
     {
       metric: "[MOCK] CTA 클릭/신청 수 (등록·구독 등 전환 행동)",
-      tier: "conversion_action",
+      category: "conversion_action",
       rationale: "[MOCK] 내부 증거 없음 — 검증 필요. 아직 qualified lead로 이어진 사례가 없어 전환 행동 수준에서만 지표를 제안합니다.",
     },
   ],
