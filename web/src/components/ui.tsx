@@ -33,6 +33,12 @@ export function Card({
 export function NavBar() {
   return (
     <nav className="flex gap-4 text-sm border-b border-neutral-200 dark:border-neutral-800 pb-3">
+      <Link href="/radar" className="hover:underline">
+        Radar
+      </Link>
+      <Link href="/insights" className="hover:underline">
+        근거
+      </Link>
       <Link href="/" className="hover:underline">
         대시보드
       </Link>

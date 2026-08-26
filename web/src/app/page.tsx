@@ -1,6 +1,9 @@
 import { getDashboardData } from "@/lib/dashboard-data";
 import { Card, EmptyState, NavBar } from "@/components/ui";
 
+// Read live from Supabase on every request (see /radar for why).
+export const dynamic = "force-dynamic";
+
 const STATUS_LABEL: Record<string, string> = {
   draft: "초안",
   review: "검토중",

@@ -1,4 +1,8 @@
 import { getIdeas } from "@/lib/idea-agent";
+
+// Read live from Supabase on every request (see /radar for why).
+export const dynamic = "force-dynamic";
+
 import { Card, EmptyState, NavBar } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { generateIdeasAction } from "./actions";
