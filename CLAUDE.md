@@ -78,10 +78,10 @@ Following mentor feedback, the team completed a pivot audit (2026-08-26) across 
 New Core MVP Loop
 External market / competitor signals
 + Codepresso internal evidence (past content performance + qualified B2B inquiry evidence)
-→ Opportunity recommendation
-→ Channel selection
-→ Content idea
-→ Final draft / human handoff
+→ Relevant Opportunity
+→ Opportunity Brief (this is the core product output — not a final draft)
+
+Actual article/post drafting is downstream, optional, and out of MVP scope (see 3.1.1). ChatGPT, Claude, or another existing writing tool can take an approved Opportunity Brief and produce the draft.
 
 What we are NOT building as the core MVP
 
@@ -90,6 +90,7 @@ What we are NOT building as the core MVP
 * a CRM
 * a publishing/distribution platform (existing tools already handle this)
 * a complex, general-purpose attribution system
+* full article/post writing automation (drafting is a downstream handoff to an existing writing tool, not something Ganache needs to generate itself)
 
 Governing principles
 
@@ -100,7 +101,22 @@ Governing principles
 * Human approval remains required before an Opportunity or Content Idea moves forward — this pivot does not remove Section 6's human-in-the-loop principle.
 
 What this means for existing work
-The existing DB schema (Section 11) already supports this direction without changes: `trends` = external signal, `lead_events`/`content_metrics` = internal evidence, `content_insights`/`insight_sources`/`idea_trends`/`idea_insights` = traceable evidence links, `ideas` = Opportunity. Existing Stage 7–8 code (performance/insight pages) is reused as the internal-evidence half of the new Opportunity/Evidence experience, not discarded.
+The existing DB schema (Section 11) already supports this direction without changes: `trends` = external signal, `lead_events`/`content_metrics` = internal evidence, `content_insights`/`insight_sources`/`idea_trends`/`idea_insights` = traceable evidence links. An Opportunity is a computed, read-only pairing of one external trend with matching internal evidence (see the /insights Opportunity Candidate feature) — it is NOT stored in `ideas`. `ideas` remains the downstream Content Idea entity, created later via Opportunity → Channel selection → Content Idea. Existing Stage 7–8 code (performance/insight pages) is reused as the internal-evidence half of the new Opportunity/Evidence experience, not discarded.
+
+3.1.1 Opportunity Brief (Core Product Output)
+A relevant Opportunity is presented as an Opportunity Brief. The human reviews, validates, and decides whether to act on the Brief. This Brief — not a generated article or post — is Ganache's core deliverable. Every Opportunity Brief must contain:
+
+* why this signal is relevant to Codepresso
+* external evidence / source (the market/competitor signal)
+* internal evidence, if available (qualified B2B inquiry / past content performance)
+* relevance / confidence
+* recommended target audience
+* recommended channel
+* suggested content angle
+* 2–3 key talking points
+* traceable sources / evidence (both external and internal)
+
+Do not conflate an Opportunity Brief with a finished draft. Writing the actual article/post is explicitly out of MVP scope — an approved Brief can be handed to ChatGPT, Claude, or another writing tool downstream. Any existing draft-generation code may remain in the codebase as an optional/future feature, but no further MVP time should go into building or extending it.
 
 4. Current Workflow and Pain Points
 Every implementation decision should remain grounded in these actual client problems.
