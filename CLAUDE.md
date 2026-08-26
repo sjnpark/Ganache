@@ -72,6 +72,52 @@ When designing any feature, ask:
 How does this help Codepresso create, distribute, understand, or improve content that generates B2B leads?
 Do not optimize vanity metrics at the expense of this objective.
 
+3.1 MVP Pivot (Post-Mentoring, Current & Authoritative)
+Following mentor feedback, the team completed a pivot audit (2026-08-26) across all three members. This section defines the current core MVP. Where it conflicts with the original 8-stage framing elsewhere in this file (especially Section 5's end-to-end diagram and Section 14's original scope), this section takes precedence for what to build next; the earlier sections remain background and long-term vision, not the near-term target.
+
+New Core MVP Loop
+External market / competitor signals
++ Codepresso internal evidence (past content performance + qualified B2B inquiry evidence)
+→ Relevant Opportunity
+→ Opportunity Brief (this is the core product output — not a final draft)
+
+Actual article/post drafting is downstream, optional, and out of MVP scope (see 3.1.1). ChatGPT, Claude, or another existing writing tool can take an approved Opportunity Brief and produce the draft.
+
+What we are NOT building as the core MVP
+
+* a full 8-stage automation system
+* a new social media tracking tool
+* a CRM
+* a publishing/distribution platform (existing tools already handle this)
+* a complex, general-purpose attribution system
+* full article/post writing automation (drafting is a downstream handoff to an existing writing tool, not something Ganache needs to generate itself)
+
+Governing principles
+
+* External views/likes/virality are market attention signals only — never proof of B2B conversion.
+* Qualified inquiry data (`lead_events.qualified = true`) is the internal business evidence — the real ground truth.
+* "Opportunity" and "Content Idea" are distinct concepts: an Opportunity is a recommended direction backed by evidence; a Content Idea is the channel-specific execution of an approved Opportunity. Do not collapse the two.
+* Every recommendation (Opportunity or Content Idea) must show why it was made, with a traceable path back to its supporting external signal(s) and/or internal evidence.
+* Human approval remains required before an Opportunity or Content Idea moves forward — this pivot does not remove Section 6's human-in-the-loop principle.
+
+What this means for existing work
+The existing DB schema (Section 11) already supports this direction without changes: `trends` = external signal, `lead_events`/`content_metrics` = internal evidence, `content_insights`/`insight_sources`/`idea_trends`/`idea_insights` = traceable evidence links. An Opportunity is a computed, read-only pairing of one external trend with matching internal evidence (see the /insights Opportunity Candidate feature) — it is NOT stored in `ideas`. `ideas` remains the downstream Content Idea entity, created later via Opportunity → Channel selection → Content Idea. Existing Stage 7–8 code (performance/insight pages) is reused as the internal-evidence half of the new Opportunity/Evidence experience, not discarded.
+
+3.1.1 Opportunity Brief (Core Product Output)
+A relevant Opportunity is presented as an Opportunity Brief. The human reviews, validates, and decides whether to act on the Brief. This Brief — not a generated article or post — is Ganache's core deliverable. Every Opportunity Brief must contain:
+
+* why this signal is relevant to Codepresso
+* external evidence / source (the market/competitor signal)
+* internal evidence, if available (qualified B2B inquiry / past content performance)
+* relevance / confidence
+* recommended target audience
+* recommended channel
+* suggested content angle
+* 2–3 key talking points
+* traceable sources / evidence (both external and internal)
+
+Do not conflate an Opportunity Brief with a finished draft. Writing the actual article/post is explicitly out of MVP scope — an approved Brief can be handed to ChatGPT, Claude, or another writing tool downstream. Any existing draft-generation code may remain in the codebase as an optional/future feature, but no further MVP time should go into building or extending it.
+
 4. Current Workflow and Pain Points
 Every implementation decision should remain grounded in these actual client problems.
 Stage 1 — Idea
@@ -222,6 +268,7 @@ and:
 Based on previous performance, what should Codepresso create next, and why?
 
 5. End-to-End Product Logic
+Note: this section describes Ganache's original long-term 8-stage vision. Following the pivot in Section 3.1, the core MVP being built now is the narrower Opportunity/Evidence loop — this diagram is background and long-term direction, not the near-term implementation target.
 The project must behave as a connected system:
 Historical Data + Current Context
 ↓
@@ -376,8 +423,9 @@ Ayoung
 
 Yeonwoo
 
-* Stage 7: Performance Collection
-* Stage 8: Data Accumulation & Feedback
+* Internal Evidence / Intelligence layer (post-pivot — see Section 3.1): past content performance, qualified B2B inquiry evidence, and traceable Opportunity / Content Idea recommendation logic. Builds on the former Stage 7 (Performance Collection) and Stage 8 (Data Accumulation & Feedback) scope.
+
+Note: following the Section 3.1 pivot, all three members' scopes are being realigned to the narrower Opportunity/Evidence MVP. Seojin's and Ayoung's bullet lists above reflect the original 8-stage assignment and should be treated as provisional until each member's specific post-pivot responsibilities are confirmed and recorded here.
 
 Ownership is intended to coordinate work, not to create isolated systems.
 Before changing another member's area substantially:
@@ -406,6 +454,7 @@ A feature is not complete merely because its UI works.
 It must fit the end-to-end workflow.
 14. MVP Principle
 This is an 8-day Builderthon.
+See Section 3.1 for the current, authoritative MVP scope (post-pivot) — the discipline below still applies, but the specific 8-stage target it originally referred to has been superseded.
 Do not overengineer.
 Prefer:
 
