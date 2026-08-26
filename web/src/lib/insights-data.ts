@@ -6,6 +6,7 @@ import type {
   OpportunityCandidate,
   OpportunityEvidenceItem,
   Trend,
+  ValidationState,
 } from "./types";
 
 export type InsightsOverview = {
@@ -232,16 +233,58 @@ function computeOpportunityCandidates(
       (a, b) => b.qualified_leads - a.qualified_leads
     );
 
+    const totalQualifiedLeads = evidence.reduce((sum, e) => sum + e.qualified_leads, 0);
+
+    // Evidence tier: only ever "qualified_b2b_inquiry" or "attention_only"
+    // today (see CLAUDE.md Section 3.1 hierarchy) — the stronger tiers
+    // require data Codepresso has not yet provided, so they are never
+    // computed here.
+    let evidenceTier: OpportunityCandidate["evidence_tier"] = null;
+    if (totalQualifiedLeads > 0) {
+      evidenceTier = "qualified_b2b_inquiry";
+    } else if (evidence.length > 0) {
+      const hasAttentionData = evidence.some((e) => {
+        const row = byContent.find((c) => c.content_id === e.content_id);
+        return (row?.views ?? 0) > 0 || (row?.clicks ?? 0) > 0;
+      });
+      evidenceTier = hasAttentionData ? "attention_only" : null;
+    }
+
+    const validationState: ValidationState =
+      totalQualifiedLeads > 0
+        ? "supported"
+        : evidence.length > 0
+          ? "partial_evidence"
+          : "validation_needed";
+
+    const matchedTagList = Array.from(matchedTags);
+    const tagText = matchedTagList.join(", ");
+    let rationale: string;
+    if (totalQualifiedLeads > 0) {
+      rationale = `This market signal matches ${tagText}. Related Codepresso content generated ${totalQualifiedLeads} qualified B2B lead${totalQualifiedLeads === 1 ? "" : "s"}.`;
+    } else if (evidence.length > 0) {
+      rationale = `This market signal matches ${tagText}. Related Codepresso content exists, but no qualified B2B inquiry evidence is available yet.`;
+    } else {
+      rationale =
+        "This is a relevant external market signal, but no matching internal business evidence is currently available.";
+    }
+
     return {
+      id: trend.id,
       signal: {
         trend_id: trend.id,
         trend_title: trend.title,
+        summary: trend.summary,
+        source: trend.source,
         relevance_score: trend.relevance_score,
         tags: trend.tags,
       },
-      matchedTags: Array.from(matchedTags),
+      matchedTags: matchedTagList,
       evidence,
       hasInternalEvidence: evidence.length > 0,
+      evidence_tier: evidenceTier,
+      validation_state: validationState,
+      rationale,
     };
   });
 }

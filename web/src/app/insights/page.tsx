@@ -33,6 +33,29 @@ const INSIGHT_TYPE_LABEL: Record<string, string> = {
   general: "일반",
 };
 
+const VALIDATION_STATE_LABEL: Record<string, string> = {
+  supported: "Supported",
+  partial_evidence: "Partial Evidence",
+  validation_needed: "Validation Needed",
+};
+
+const VALIDATION_STATE_CLASS: Record<string, string> = {
+  supported:
+    "bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300",
+  partial_evidence:
+    "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300",
+  validation_needed:
+    "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400",
+};
+
+const EVIDENCE_TIER_LABEL: Record<string, string> = {
+  downstream_business_outcome: "Downstream Business Outcome",
+  qualified_b2b_inquiry: "Qualified B2B Inquiry",
+  strong_engagement_outcome: "Strong Engagement Outcome",
+  conversion_action: "Conversion Action",
+  attention_only: "Attention Only",
+};
+
 export default async function InsightsPage() {
   const {
     insights,
@@ -205,17 +228,41 @@ export default async function InsightsPage() {
           <ul className="flex flex-col gap-4">
             {opportunities.map((opp) => (
               <li
-                key={opp.signal.trend_id}
+                key={opp.id}
                 className="border border-neutral-100 dark:border-neutral-800 rounded-md p-4 flex flex-col gap-2"
               >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`inline-block rounded-full text-xs font-semibold px-2 py-0.5 ${VALIDATION_STATE_CLASS[opp.validation_state]}`}
+                  >
+                    {VALIDATION_STATE_LABEL[opp.validation_state]}
+                  </span>
+                  {opp.evidence_tier && (
+                    <span className="inline-block rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs px-2 py-0.5">
+                      {EVIDENCE_TIER_LABEL[opp.evidence_tier]}
+                    </span>
+                  )}
+                  <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                    id: {opp.id}
+                  </span>
+                </div>
+
+                <p className="text-sm">{opp.rationale}</p>
+
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
                     외부 신호 (Signal)
                   </p>
                   <p className="text-sm font-medium">{opp.signal.trend_title}</p>
+                  {opp.signal.summary && (
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      {opp.signal.summary}
+                    </p>
+                  )}
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">
                     {opp.signal.relevance_score !== null &&
                       `시장 관심도(참고용) ${Math.round(opp.signal.relevance_score * 100)}% · `}
+                    {opp.signal.source && `출처: ${opp.signal.source} · `}
                     태그: {opp.signal.tags.join(", ")}
                   </p>
                 </div>
