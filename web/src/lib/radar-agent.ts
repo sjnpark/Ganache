@@ -37,9 +37,14 @@ export async function getRadar(): Promise<{
   const supabase = createSupabaseServerClient();
   const [ctxRes, signalsRes] = await Promise.all([
     supabase.from("business_context").select("*").eq("is_current", true).maybeSingle(),
+    // Archived signals are retired from the product experience but kept in the
+    // table so existing idea_trends links stay intact. Must match the same
+    // filter in getInsightsOverview so Radar and Opportunity Candidate work
+    // off one identical active signal set.
     supabase
       .from("trends")
       .select("*")
+      .neq("status", "archived")
       .order("collected_at", { ascending: false })
       .limit(8),
   ]);

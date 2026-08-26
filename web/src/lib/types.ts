@@ -12,6 +12,9 @@ export type Trend = {
   title: string;
   summary: string | null;
   source: string | null;
+  // Already a column on the trends table; surfaced here so the UI can link
+  // back to the original public source. Nullable.
+  url: string | null;
   relevance_score: number | null;
   status: string;
   collected_at: string;
@@ -138,6 +141,10 @@ export type OpportunitySignal = {
   trend_title: string;
   summary: string | null;
   source: string | null;
+  // Link to the original public source, when the trend row has one. Nullable —
+  // older/synthetic signals have no traceable URL, and the UI must render
+  // without a link rather than inventing one.
+  url: string | null;
   relevance_score: number | null;
   tags: string[];
 };

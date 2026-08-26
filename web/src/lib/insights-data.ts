@@ -40,9 +40,14 @@ export async function getInsightsOverview(): Promise<InsightsOverview> {
     supabase.from("contents").select("id, title, channel"),
     supabase.from("content_latest_metrics").select("content_id, views, clicks"),
     supabase.from("lead_events").select("content_id, channel, qualified"),
+    // `url` is selected so an Opportunity Candidate can carry a link back to
+    // the original public source. Archived signals are excluded to match the
+    // same filter in getRadar(), so Radar and Opportunity Candidate operate on
+    // one identical active signal set.
     supabase
       .from("trends")
-      .select("id, title, summary, source, relevance_score, status, collected_at, tags")
+      .select("id, title, summary, source, url, relevance_score, status, collected_at, tags")
+      .neq("status", "archived")
       .order("collected_at", { ascending: false }),
   ]);
 
@@ -276,6 +281,7 @@ function computeOpportunityCandidates(
         trend_title: trend.title,
         summary: trend.summary,
         source: trend.source,
+        url: trend.url,
         relevance_score: trend.relevance_score,
         tags: trend.tags,
       },

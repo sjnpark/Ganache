@@ -286,7 +286,22 @@ export function RadarWizard({
             </div>
 
             <p className="text-xs text-neutral-400">
-              출처: {candidate.signal.source ?? "출처 미기재"} · trend {candidate.id}
+              출처: {candidate.signal.source ?? "출처 미기재"}
+              {candidate.signal.url && (
+                <>
+                  {" · "}
+                  <a
+                    href={candidate.signal.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-neutral-600 dark:hover:text-neutral-300"
+                  >
+                    원문 보기
+                  </a>
+                </>
+              )}
+              {" · trend "}
+              {candidate.id}
             </p>
 
             <div>
