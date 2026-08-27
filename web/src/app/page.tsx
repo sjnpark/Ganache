@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { Card, EmptyState, NavBar } from "@/components/ui";
 
@@ -14,6 +15,11 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function Home() {
+  // Final-demo cleanup: "/" now sends visitors straight to /radar. The
+  // legacy dashboard below is intentionally left in place (not deleted) —
+  // it stays reachable if this redirect is ever removed.
+  redirect("/radar");
+
   const { trends, pipeline, topPerforming } = await getDashboardData();
 
   return (
