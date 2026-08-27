@@ -31,22 +31,13 @@ export function Card({
 }
 
 export function NavBar() {
+  // Final-demo cleanup: only Radar is shown in the visible nav. The other
+  // routes (/insights, /, /ideas, /planning) and their code are untouched
+  // and still reachable directly by URL — only their nav links are hidden.
   return (
     <nav className="flex gap-4 text-sm border-b border-neutral-200 dark:border-neutral-800 pb-3">
       <Link href="/radar" className="hover:underline">
         Radar
-      </Link>
-      <Link href="/insights" className="hover:underline">
-        근거
-      </Link>
-      <Link href="/" className="hover:underline">
-        대시보드
-      </Link>
-      <Link href="/ideas" className="hover:underline">
-        아이디어
-      </Link>
-      <Link href="/planning" className="hover:underline">
-        기획
       </Link>
     </nav>
   );
