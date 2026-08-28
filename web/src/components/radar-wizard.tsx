@@ -80,7 +80,18 @@ function Step({
   );
 }
 
-function briefToPlainText(brief: OpportunityBrief): string {
+// The handoff payload. This is the whole point of the copy button: the
+// approved brief has to survive being pasted into a writing tool that has no
+// access to Ganache, so the evidence constraints travel with it — otherwise
+// the downstream model is free to invent the numbers we deliberately withheld.
+//
+// `candidate` is passed in (rather than read off the brief) because the
+// validation state and rationale live on Yeonwoo's Opportunity Candidate, not
+// on Ahyoung's brief object.
+function briefToPlainText(
+  brief: OpportunityBrief,
+  candidate: OpportunityCandidate | null
+): string {
   const lines = [
     `# ${brief.opportunity_title}`,
     ``,
@@ -90,6 +101,19 @@ function briefToPlainText(brief: OpportunityBrief): string {
     `## 추천 대상 독자`,
     brief.recommended_target_audience,
     ``,
+    ...(candidate
+      ? [
+          `## 근거 및 검증 제약`,
+          `검증 상태: ${VALIDATION_LABEL[candidate.validation_state].label} — ${VALIDATION_LABEL[candidate.validation_state].note}`,
+          ...(candidate.evidence_tier
+            ? [
+                `근거 등급: ${TIER_LABEL[candidate.evidence_tier] ?? candidate.evidence_tier}`,
+              ]
+            : []),
+          `판단 근거: ${candidate.rationale}`,
+          ``,
+        ]
+      : []),
     // Mirrors the card: the adaptation plan replaces the single-channel
     // recommendation when present, and the old line is kept for briefs
     // generated before that upgrade.
@@ -183,10 +207,32 @@ function briefToPlainText(brief: OpportunityBrief): string {
           .join("\n")
       : "내부 비즈니스 근거 없음 — 외부 신호만으로 판단이 필요합니다.",
     ``,
+    `## 추천 액션 / CTA`,
+    brief.recommended_marketing_action,
+    ``,
+    // Success metrics were removed from the card UI but are still generated,
+    // and the writing tool needs them to know what the piece is aiming at.
+    // These are proposals for what to measure, NOT measured results.
+    ...(brief.success_metrics.length > 0
+      ? [
+          `## 성공 지표 제안 (측정 대상 — 실측치 아님)`,
+          ...brief.success_metrics.map(
+            (m) => `- ${m.metric} — ${m.rationale}`
+          ),
+          ``,
+        ]
+      : []),
     `## 출처`,
     ...brief.sources.map(
       (s) => `- [${s.type}] ${s.label}${s.detail ? ` — ${s.detail}` : ""}`
     ),
+    ``,
+    `---`,
+    ``,
+    `## 실행 지시 (이 Brief를 받은 AI에게)`,
+    `Use this approved Opportunity Brief as the decision context for final content creation. Preserve the target audience, Search & AI Discovery Strategy, Channel Adaptation Plan, CTA, and evidence constraints. Do not invent unsupported claims or metrics.`,
+    ``,
+    `위 지시를 한국어로 옮기면: 승인된 이 Opportunity Brief를 최종 콘텐츠 제작의 판단 근거로 사용하세요. 대상 독자, 검색 & AI 발견 전략, 채널 적응 계획, CTA, 근거 제약을 그대로 유지하세요. 근거 없는 주장이나 수치를 지어내지 마세요.`,
   ];
   return lines.join("\n");
 }
@@ -236,7 +282,7 @@ export function RadarWizard({
   async function copyBrief() {
     if (!brief) return;
     try {
-      await navigator.clipboard.writeText(briefToPlainText(brief));
+      await navigator.clipboard.writeText(briefToPlainText(brief, candidate));
       setCopied(true);
     } catch {
       setError("클립보드 복사에 실패했어요. 브라우저 권한을 확인해주세요.");
@@ -401,24 +447,71 @@ export function RadarWizard({
         )}
       </Step>
 
-      <Step n={4} title="Human Decision — 승인 / 반려" active={!!brief && !decision} done={!!decision}>
+      <Step
+        n={4}
+        title="Human Review & AI Handoff — 검토 · 승인 · 전달"
+        active={!!brief && !decision}
+        done={!!decision}
+      >
         {!brief ? (
           <p className="text-sm text-neutral-400 italic">
             Brief가 생성되면 위 카드에서 승인 또는 반려할 수 있어요.
           </p>
         ) : !decision ? (
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            Brief 카드의 승인 / 반려 버튼으로 판단해주세요. 최종 결정은 사람이 합니다.
-          </p>
+          // Pre-approval. The checklist names the four things a marketer
+          // should actually look at, because "승인/반려" alone gave no clue
+          // what the review was for.
+          <div className="flex flex-col gap-3 text-sm">
+            <p className="text-neutral-700 dark:text-neutral-200">
+              승인하기 전에 아래 네 가지를 확인해주세요. 최종 결정은 사람이 합니다.
+            </p>
+            <ul className="flex flex-col gap-1.5 text-neutral-600 dark:text-neutral-300">
+              {[
+                "왜 지금인가 — 근거와 검증 상태가 납득되는지",
+                "검색 & AI 발견 전략 — 키워드와 검색 의도가 맞는지",
+                "채널 적응 계획 — 블로그·LinkedIn·SNS 방향이 적절한지",
+                "전체 실행 방향 — 코드프레소가 실제로 실행할 만한지",
+              ].map((item) => (
+                <li key={item} className="flex gap-2">
+                  <span className="text-neutral-400 shrink-0">□</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              확인 후 위 Brief 카드의 승인 / 반려 버튼을 눌러주세요.
+            </p>
+          </div>
         ) : decision === "rejected" ? (
           <p className="text-sm text-neutral-600 dark:text-neutral-300">
             반려했습니다. 다른 신호를 선택해 다시 검토해보세요.
           </p>
         ) : (
+          // Post-approval: the handoff. Ganache stops here by design
+          // (CLAUDE.md 3.1.1) — we hand the approved Brief over, we do not
+          // write the draft, and we are NOT integrated with any of the tools
+          // named below. The marketer pastes it in themselves.
           <div className="flex flex-col gap-3 text-sm">
-            <p className="text-neutral-700 dark:text-neutral-200">
-              승인했습니다. 이 Brief를 그대로 글쓰기 도구에 넘기면 됩니다.
+            <p className="font-medium text-neutral-800 dark:text-neutral-100">
+              승인됨 — AI 핸드오프 준비 완료
             </p>
+            <p className="text-neutral-700 dark:text-neutral-200">
+              이 Brief를 복사해서 아래와 같은 글쓰기 AI에 붙여넣으면 초안 작성을
+              이어갈 수 있습니다.
+            </p>
+            <ul className="flex flex-col gap-1 text-neutral-600 dark:text-neutral-300">
+              {[
+                "코드프레소 사내 AI",
+                "Claude",
+                "ChatGPT",
+                "그 외 선호하는 글쓰기 모델",
+              ].map((tool) => (
+                <li key={tool} className="flex gap-2">
+                  <span className="text-neutral-400 shrink-0">·</span>
+                  <span>{tool}</span>
+                </li>
+              ))}
+            </ul>
             <div>
               <button
                 type="button"
@@ -429,9 +522,10 @@ export function RadarWizard({
               </button>
             </div>
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
-              복사한 Brief를 ChatGPT, Claude 등 기존 글쓰기 도구에 붙여넣어 초안을
-              작성하세요. Ganache는 여기까지 — 초안 작성은 기존 도구를 그대로
-              쓰시면 됩니다.
+              복사본에는 근거·검증 제약, 검색 & AI 발견 전략, 채널 적응 계획,
+              CTA, 그리고 &ldquo;근거 없는 수치를 지어내지 말라&rdquo;는 실행
+              지시가 함께 들어갑니다. Ganache는 여기까지 — 위 도구들과 직접
+              연동되어 있지는 않으니, 복사해서 붙여넣어 주세요.
             </p>
           </div>
         )}
