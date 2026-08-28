@@ -213,10 +213,13 @@ export function RadarWizard({
                     }`}
                   >
                     <span className="font-medium">{s.title}</span>
+                    {/* relevance_score is deliberately not shown. It is an
+                        internal heuristic, not a measured market metric, so
+                        displaying it as a percentage implied a precision we
+                        cannot defend. It still exists on the row and is passed
+                        to brief generation as context. */}
                     <span className="block text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                      {s.relevance_score !== null &&
-                        `관련도 ${Math.round(s.relevance_score * 100)}%`}
-                      {s.source ? ` · ${s.source}` : ""}
+                      {s.source ?? "출처 미기재"}
                     </span>
                   </button>
                 </li>

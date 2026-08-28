@@ -2,22 +2,13 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui";
-import type {
-  OpportunityBrief,
-  SuccessMetricCategory,
-} from "@/lib/opportunity-brief-types";
+import type { OpportunityBrief } from "@/lib/opportunity-brief-types";
 
-// Labels for SuccessMetricCategory — what to measure going forward, NOT
-// how strong current evidence is (that's EvidenceTier, a separate concept
-// this component doesn't need to render).
-const SUCCESS_METRIC_CATEGORY_LABEL: Record<SuccessMetricCategory, string> = {
-  qualified_b2b_inquiry: "Qualified B2B 문의",
-  enterprise_inquiry: "엔터프라이즈 문의",
-  organic_search_traffic: "오가닉 검색 유입",
-  search_visibility: "검색 노출 / 순위",
-  conversion_action: "등록 / CTA 제출",
-  attention_metric: "주목도 지표 (참고용)",
-};
+// The success-metrics section was removed from this card (the KPI is already
+// fixed by the brief itself), so the SuccessMetricCategory label map that
+// rendered it is gone too. `success_metrics` is still generated and still on
+// the OpportunityBrief object — restoring the section means re-adding the
+// label map and the block above the "내부 증거" divider.
 
 type Decision = "approved" | "rejected" | null;
 
@@ -51,13 +42,12 @@ export function OpportunityBriefCard({
   return (
     <Card
       title="Opportunity Brief"
+      // brief.confidence is deliberately not shown here. It is the model's own
+      // self-reported number with no measurable basis, so presenting it as a
+      // percentage overstated how defensible it is. The field is still
+      // generated and available on the object.
       action={
         <div className="flex items-center gap-2">
-          {brief.confidence !== null && (
-            <span className="text-xs text-neutral-400 dark:text-neutral-500">
-              확신도 {Math.round(brief.confidence * 100)}%
-            </span>
-          )}
           {decision && (
             <span
               className={`text-xs px-2 py-0.5 rounded-full ${
@@ -209,30 +199,11 @@ export function OpportunityBriefCard({
           {brief.recommended_marketing_action}
         </p>
 
-        {brief.success_metrics.length > 0 && (
-          <div>
-            <p className="font-medium text-neutral-700 dark:text-neutral-200 mb-1.5">
-              성공 지표 제안
-            </p>
-            <ul className="flex flex-col gap-1.5">
-              {brief.success_metrics.map((m, i) => (
-                <li key={i} className="text-neutral-600 dark:text-neutral-300">
-                  <span className="inline-block text-xs px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 mr-1.5">
-                    {SUCCESS_METRIC_CATEGORY_LABEL[m.category]}
-                  </span>
-                  <span className="font-medium text-neutral-800 dark:text-neutral-100">
-                    {m.metric}
-                  </span>
-                  {m.rationale && (
-                    <span className="block text-xs text-neutral-400 dark:text-neutral-500">
-                      {m.rationale}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {/* The success-metrics section is deliberately not shown. The KPI is
+            already fixed by the brief (qualified B2B inquiries), so restating
+            suggested metrics per brief added length without adding a decision
+            the reader actually has to make. success_metrics is still generated
+            and available on the object. */}
 
         <div className="border-t border-neutral-100 dark:border-neutral-900 pt-3">
           <p className="font-medium text-neutral-700 dark:text-neutral-200 mb-1">
