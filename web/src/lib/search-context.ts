@@ -5,13 +5,13 @@
 // live in the prompt in `opportunity-brief.ts` (part B).
 //
 // Everything here was observed by running the actual queries listed in
-// `query` fields on 2026-08-27. Nothing is estimated. There are deliberately
+// `query` fields on 2026-08-28. Nothing is estimated. There are deliberately
 // NO search volumes, CTRs, rankings or traffic numbers — we cannot measure
 // those, so we do not record them (CLAUDE.md 3.2).
 //
 // When this gets re-checked, update OBSERVED_ON and the findings together.
 
-export const SEARCH_CONTEXT_OBSERVED_ON = "2026-08-27";
+export const SEARCH_CONTEXT_OBSERVED_ON = "2026-08-28";
 
 type IntentConflict = {
   query: string;
