@@ -6,6 +6,7 @@ import {
   type OpportunityBrief,
   type OpportunityBriefAlternativeChannel,
   type OpportunityBriefBusinessContext,
+  type OpportunityBriefChannelAdaptation,
   type OpportunityBriefChannelRecommendation,
   type OpportunityBriefEvidenceItem,
   type OpportunityBriefSearchStrategy,
@@ -44,6 +45,16 @@ type GeneratedBriefJudgment = {
     label: string;
     suggested_format_or_angle: string;
   }[];
+  // Channel Adaptation Plan. Optional here because the model may omit it;
+  // normalizeChannelAdaptation returns undefined in that case and the card
+  // falls back to the recommended/alternative channel blocks.
+  channel_adaptation?: {
+    core_idea?: string;
+    blog?: { angle?: string; emphasis?: string; search_strategy_link?: string };
+    linkedin?: { reframe?: string; hook?: string; why?: string };
+    instagram_facebook?: { reframe?: string; hook?: string; why?: string };
+    pr_media?: { is_relevant?: boolean; angle_or_reason?: string };
+  };
   search_strategy: {
     recommended_keywords: string[];
     seo_title_direction: string;
@@ -114,10 +125,24 @@ const INSTRUCTION = `
 이 Brief는 최종 원고가 아니라, 사람이 검토 후 진행 여부를 결정하는 전략 요약입니다.
 실제 글(블로그/LinkedIn 포스트 등)을 쓰지 마세요 — 채널, 검색 전략, 각도, 핵심 메시지만 제안하면 됩니다.
 
-[채널 추천]
-- recommended_channel의 channel 값은 반드시 다음 중 하나여야 합니다: ${KNOWN_CHANNELS.join(", ")}
-- 가장 적합한 채널 1개만 recommended_channel로 선정하고, 왜 그 채널인지 reason에 구체적으로 설명하세요.
-- alternative_channels에는 recommended_channel과 다른 채널 중 실제로 쓸만한 것 2~4개를 제시하고, 각각 짧은 suggested_format_or_angle을 붙이세요. channel 값도 위 목록 중에서만 고르세요.
+[채널 적응 계획] — Codepresso는 블로그 아티클을 먼저 쓰고, 같은 내용을 LinkedIn·인스타/페이스북 등으로 변형해 올립니다. 따라서 "채널 하나를 고르는 것"이 아니라 "하나의 핵심 아이디어가 채널마다 어떻게 달라지는지"를 알려주세요.
+
+- 채널은 서로 배타적이지 않습니다. LinkedIn 각도를 제안한다고 해서 블로그에 올리지 말라는 뜻이 절대 아닙니다.
+- core_idea에 모든 채널이 공유할 핵심 아이디어 1개를 쓰세요. 아래 각 채널은 이 아이디어의 변형이어야 합니다.
+- 완성된 글이나 게시물 본문을 쓰지 마세요. 어떻게 변형할지만 제안하세요.
+- 각 채널마다 왜 그 변형이 그 플랫폼에 맞는지(why) 반드시 설명하세요.
+- 플랫폼별 도달률·참여율·전환율 같은 성과 수치를 지어내지 마세요. 측정된 값이 없습니다.
+- 간결하게, 판단에 필요한 만큼만 쓰세요.
+
+채널별 지침:
+- blog: Codepresso의 canonical(기준) 콘텐츠입니다. angle에 롱폼 핵심 각도, emphasis에 블로그에서 특히 강조할 것, search_strategy_link에 위 검색 전략(핵심 키워드·소제목·AEO 질문)과 어떻게 연결되는지를 쓰세요.
+- linkedin: 같은 아이디어를 엔터프라이즈 의사결정자 / HR·L&D 독자에게 맞게 어떻게 다시 잡을지(reframe), 어떤 훅으로 시작할지(hook), 왜 그게 이 독자에게 맞는지(why).
+- instagram_facebook: 같은 아이디어를 어떻게 짧게 줄이거나 시각화할지(reframe), 캐러셀/비주얼 요약 훅(hook), 왜 그 형태가 맞는지(why).
+- pr_media: 이 기회에 진짜 뉴스 가치(행사, 파트너십, 신규 리포트 발간, 주요 기업 동향 등)가 있을 때만 is_relevant를 true로 하고 angle_or_reason에 보도 앵글을 쓰세요. 뉴스 가치가 없으면 is_relevant를 false로 하고 angle_or_reason에 왜 PR이 필요 없는지 쓰세요. PR 앵글을 억지로 만들어내지 마세요.
+
+또한 아래 기존 필드도 계속 채우세요 (하위 호환용):
+- recommended_channel의 channel 값은 반드시 다음 중 하나여야 합니다: ${KNOWN_CHANNELS.join(", ")}. 이 기회에 가장 먼저 만들 canonical 채널을 고르세요(보통 blog_kr).
+- alternative_channels에는 그 외 실제로 쓸만한 채널 2~4개와 짧은 suggested_format_or_angle. channel 값도 위 목록 중에서만.
 
 [검색 & AI 발견 전략] — Codepresso 인바운드의 70~80%가 검색(구글/네이버)에서 발생하므로, 채널 추천만큼 중요하게 다루세요.
 아래 8개 규칙은 항상 적용됩니다. 아래에 별도로 주어지는 "검색 환경 관측 결과"는 시점이 찍힌 참고 근거이며, 규칙과 충돌하면 규칙을 따르세요.
@@ -168,7 +193,7 @@ const INSTRUCTION = `
 - confidence는 0.0~1.0 사이 숫자로, 이 추천에 대한 확신도를 나타내세요.
 
 다음 JSON 형식으로만 응답하세요:
-{"opportunity_title": "...", "why_now": "...", "recommended_target_audience": "...", "recommended_channel": {"channel": "...", "label": "...", "reason": "..."}, "alternative_channels": [{"channel": "...", "label": "...", "suggested_format_or_angle": "..."}], "search_strategy": {"primary_keyword": "...", "why_this_keyword": "...", "target_search_intent": "...", "recommended_keywords": ["...", "..."], "search_competitor_insight": "...", "content_framing": "...", "seo_title_direction": "...", "subheading_keywords": ["...", "..."], "aeo_questions": ["...", "..."], "geo_entity_angle": "...", "evidence_rationale": "...", "decision_maker_fit": "..."}, "main_content_angle": "...", "talking_points": ["...", "..."], "recommended_marketing_action": "...", "success_metrics": [{"metric": "...", "category": "...", "rationale": "..."}], "confidence": 0.0}
+{"opportunity_title": "...", "why_now": "...", "recommended_target_audience": "...", "recommended_channel": {"channel": "...", "label": "...", "reason": "..."}, "alternative_channels": [{"channel": "...", "label": "...", "suggested_format_or_angle": "..."}], "channel_adaptation": {"core_idea": "...", "blog": {"angle": "...", "emphasis": "...", "search_strategy_link": "..."}, "linkedin": {"reframe": "...", "hook": "...", "why": "..."}, "instagram_facebook": {"reframe": "...", "hook": "...", "why": "..."}, "pr_media": {"is_relevant": false, "angle_or_reason": "..."}}, "search_strategy": {"primary_keyword": "...", "why_this_keyword": "...", "target_search_intent": "...", "recommended_keywords": ["...", "..."], "search_competitor_insight": "...", "content_framing": "...", "seo_title_direction": "...", "subheading_keywords": ["...", "..."], "aeo_questions": ["...", "..."], "geo_entity_angle": "...", "evidence_rationale": "...", "decision_maker_fit": "..."}, "main_content_angle": "...", "talking_points": ["...", "..."], "recommended_marketing_action": "...", "success_metrics": [{"metric": "...", "category": "...", "rationale": "..."}], "confidence": 0.0}
 `.trim();
 
 function normalizeChannel(
@@ -194,6 +219,38 @@ function normalizeAlternatives(
     label: c.label || c.channel,
     suggested_format_or_angle: c.suggested_format_or_angle ?? "",
   }));
+}
+
+function normalizeChannelAdaptation(
+  raw: GeneratedBriefJudgment["channel_adaptation"] | undefined
+): OpportunityBriefChannelAdaptation | undefined {
+  // Blog is the canonical content, so a plan without a blog angle is not a
+  // usable plan — fall back to the older channel blocks instead of rendering
+  // a half-empty section.
+  if (!raw?.core_idea?.trim() || !raw?.blog?.angle?.trim()) return undefined;
+
+  const item = (v: { reframe?: string; hook?: string; why?: string } | undefined) => ({
+    reframe: v?.reframe?.trim() ?? "",
+    hook: v?.hook?.trim() ?? "",
+    why: v?.why?.trim() ?? "",
+  });
+
+  return {
+    core_idea: raw.core_idea.trim(),
+    blog: {
+      angle: raw.blog.angle.trim(),
+      emphasis: raw.blog.emphasis?.trim() ?? "",
+      search_strategy_link: raw.blog.search_strategy_link?.trim() ?? "",
+    },
+    linkedin: item(raw.linkedin),
+    instagram_facebook: item(raw.instagram_facebook),
+    pr_media: {
+      // Default to false: PR is opt-in, so an omitted or malformed flag must
+      // never be read as "yes, pitch this to press".
+      is_relevant: raw.pr_media?.is_relevant === true,
+      angle_or_reason: raw.pr_media?.angle_or_reason?.trim() ?? "",
+    },
+  };
 }
 
 function normalizeSuccessMetrics(
@@ -285,6 +342,7 @@ ${searchContextText()}
     recommended_target_audience: judgment.recommended_target_audience,
     recommended_channel: normalizeChannel(judgment.recommended_channel),
     alternative_channels: normalizeAlternatives(judgment.alternative_channels),
+    channel_adaptation: normalizeChannelAdaptation(judgment.channel_adaptation),
     search_strategy: normalizeSearchStrategy(judgment.search_strategy),
     main_content_angle: judgment.main_content_angle,
     talking_points: (judgment.talking_points ?? []).slice(0, 3),

@@ -12,6 +12,20 @@ import type { OpportunityBrief } from "@/lib/opportunity-brief-types";
 
 type Decision = "approved" | "rejected" | null;
 
+// One indented label/value line inside a channel block. Skipped entirely when
+// the model left the field blank.
+function ChannelRow({ label, value }: { label: string; value?: string }) {
+  if (!value) return null;
+  return (
+    <p className="text-neutral-600 dark:text-neutral-300 mt-0.5 pl-3">
+      <span className="text-xs text-neutral-500 dark:text-neutral-400">
+        {label}:{" "}
+      </span>
+      {value}
+    </p>
+  );
+}
+
 // Renders one label/value row of the search strategy, and nothing at all when
 // the model omitted that field — several of them are optional by design (e.g.
 // content_framing is skipped when no observed framing genuinely fits).
@@ -95,15 +109,102 @@ export function OpportunityBriefCard({
         {/* Channel and Search/Keyword strategy are peer sections — neither
             should visually dominate the other (Codepresso's inbound is
             70-80% search-driven, so keyword strategy matters as much as
-            channel choice). Both use the same neutral highlight styling. */}
-        <div className="rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 px-3 py-2.5">
-          <p className="font-medium">
-            ⭐ 추천 채널: {brief.recommended_channel.label}
-          </p>
-          <p className="text-neutral-600 dark:text-neutral-300 mt-0.5">
-            {brief.recommended_channel.reason}
-          </p>
-        </div>
+            channel choice). Both use the same neutral highlight styling.
+
+            When a Channel Adaptation Plan is present it replaces the older
+            "one recommended channel" block, because Codepresso publishes the
+            same idea across channels rather than picking one. The old block
+            still renders for briefs generated before that upgrade. */}
+        {brief.channel_adaptation ? (
+          <div className="rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 px-3 py-2.5">
+            <p className="font-medium">📡 채널 적응 계획</p>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+              하나의 핵심 아이디어를 채널별로 어떻게 변형할지 — 채널은 택일이
+              아닙니다.
+            </p>
+
+            <div className="mt-2 rounded bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 px-2.5 py-2">
+              <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                핵심 아이디어 (모든 채널 공통)
+              </p>
+              <p className="text-neutral-700 dark:text-neutral-200 mt-0.5">
+                {brief.channel_adaptation.core_idea}
+              </p>
+            </div>
+
+            <div className="mt-2 flex flex-col gap-2.5">
+              <div>
+                <p className="font-medium text-neutral-800 dark:text-neutral-100">
+                  📝 블로그 — canonical 콘텐츠
+                </p>
+                <ChannelRow label="핵심 각도" value={brief.channel_adaptation.blog.angle} />
+                <ChannelRow label="강조할 것" value={brief.channel_adaptation.blog.emphasis} />
+                <ChannelRow
+                  label="검색 전략 연결"
+                  value={brief.channel_adaptation.blog.search_strategy_link}
+                />
+              </div>
+
+              <div>
+                <p className="font-medium text-neutral-800 dark:text-neutral-100">
+                  💼 LinkedIn
+                </p>
+                <ChannelRow label="재구성" value={brief.channel_adaptation.linkedin.reframe} />
+                <ChannelRow label="훅" value={brief.channel_adaptation.linkedin.hook} />
+                <ChannelRow label="이유" value={brief.channel_adaptation.linkedin.why} />
+              </div>
+
+              <div>
+                <p className="font-medium text-neutral-800 dark:text-neutral-100">
+                  📱 Instagram / Facebook
+                </p>
+                <ChannelRow
+                  label="축약·시각화"
+                  value={brief.channel_adaptation.instagram_facebook.reframe}
+                />
+                <ChannelRow
+                  label="훅"
+                  value={brief.channel_adaptation.instagram_facebook.hook}
+                />
+                <ChannelRow
+                  label="이유"
+                  value={brief.channel_adaptation.instagram_facebook.why}
+                />
+              </div>
+
+              <div>
+                <p className="font-medium text-neutral-800 dark:text-neutral-100">
+                  📰 PR / 미디어
+                  {!brief.channel_adaptation.pr_media.is_relevant && (
+                    <span className="ml-1.5 text-xs font-normal px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400">
+                      해당 없음
+                    </span>
+                  )}
+                </p>
+                {brief.channel_adaptation.pr_media.angle_or_reason && (
+                  <p
+                    className={`mt-0.5 ${
+                      brief.channel_adaptation.pr_media.is_relevant
+                        ? "text-neutral-600 dark:text-neutral-300"
+                        : "text-neutral-500 dark:text-neutral-400 italic"
+                    }`}
+                  >
+                    {brief.channel_adaptation.pr_media.angle_or_reason}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 px-3 py-2.5">
+            <p className="font-medium">
+              ⭐ 추천 채널: {brief.recommended_channel.label}
+            </p>
+            <p className="text-neutral-600 dark:text-neutral-300 mt-0.5">
+              {brief.recommended_channel.reason}
+            </p>
+          </div>
+        )}
 
         {brief.search_strategy && (
           <div className="rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 px-3 py-2.5">
@@ -202,7 +303,10 @@ export function OpportunityBriefCard({
           </div>
         )}
 
-        {brief.alternative_channels.length > 0 && (
+        {/* "대안 채널" framed channels as either/or. The adaptation plan above
+            already covers every channel, so this only shows for older briefs
+            that have no adaptation plan. */}
+        {!brief.channel_adaptation && brief.alternative_channels.length > 0 && (
           <div>
             <p className="font-medium text-neutral-700 dark:text-neutral-200 mb-1.5">
               대안 채널

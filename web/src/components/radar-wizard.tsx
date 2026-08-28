@@ -90,9 +90,44 @@ function briefToPlainText(brief: OpportunityBrief): string {
     `## 추천 대상 독자`,
     brief.recommended_target_audience,
     ``,
-    `## 추천 채널`,
-    `${brief.recommended_channel.channel} — ${brief.recommended_channel.reason}`,
-    ``,
+    // Mirrors the card: the adaptation plan replaces the single-channel
+    // recommendation when present, and the old line is kept for briefs
+    // generated before that upgrade.
+    ...(brief.channel_adaptation
+      ? [
+          `## 채널 적응 계획`,
+          `핵심 아이디어 (모든 채널 공통): ${brief.channel_adaptation.core_idea}`,
+          ``,
+          `### 블로그 — canonical 콘텐츠`,
+          `- 핵심 각도: ${brief.channel_adaptation.blog.angle}`,
+          ...(brief.channel_adaptation.blog.emphasis
+            ? [`- 강조할 것: ${brief.channel_adaptation.blog.emphasis}`]
+            : []),
+          ...(brief.channel_adaptation.blog.search_strategy_link
+            ? [`- 검색 전략 연결: ${brief.channel_adaptation.blog.search_strategy_link}`]
+            : []),
+          ``,
+          `### LinkedIn`,
+          `- 재구성: ${brief.channel_adaptation.linkedin.reframe}`,
+          `- 훅: ${brief.channel_adaptation.linkedin.hook}`,
+          `- 이유: ${brief.channel_adaptation.linkedin.why}`,
+          ``,
+          `### Instagram / Facebook`,
+          `- 축약·시각화: ${brief.channel_adaptation.instagram_facebook.reframe}`,
+          `- 훅: ${brief.channel_adaptation.instagram_facebook.hook}`,
+          `- 이유: ${brief.channel_adaptation.instagram_facebook.why}`,
+          ``,
+          `### PR / 미디어`,
+          brief.channel_adaptation.pr_media.is_relevant
+            ? `- ${brief.channel_adaptation.pr_media.angle_or_reason}`
+            : `- 해당 없음. ${brief.channel_adaptation.pr_media.angle_or_reason}`,
+          ``,
+        ]
+      : [
+          `## 추천 채널`,
+          `${brief.recommended_channel.channel} — ${brief.recommended_channel.reason}`,
+          ``,
+        ]),
     // Search strategy is co-equal to the channel recommendation in the brief,
     // so the handoff copy must carry it too. Optional on the type, so guard.
     // Optional fields are skipped rather than pasted as empty labels, so the

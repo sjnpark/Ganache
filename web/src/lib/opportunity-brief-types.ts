@@ -82,6 +82,46 @@ export type OpportunityBriefAlternativeChannel = {
   suggested_format_or_angle: string;
 };
 
+// Channel Adaptation Plan.
+//
+// Codepresso writes one canonical blog article and adapts it for LinkedIn,
+// Instagram/Facebook and so on — so the useful output is not "pick a channel"
+// but "here is the one idea, and here is how it changes per platform".
+// Channels are NOT mutually exclusive: recommending a LinkedIn framing never
+// means the piece should skip the blog.
+//
+// None of these carry platform performance data. We have no measured reach,
+// engagement or conversion figures per channel, so none are stated.
+export type OpportunityBriefChannelAdaptationItem = {
+  // How the single core idea is reframed for this platform.
+  reframe: string;
+  // The opening angle / emphasis that should lead on this platform.
+  hook: string;
+  // Why this adaptation fits this platform's audience and format.
+  why: string;
+};
+
+export type OpportunityBriefChannelAdaptation = {
+  // The one idea every channel below is a variation of.
+  core_idea: string;
+  // Blog is Codepresso's canonical/master content, so it is always present
+  // and carries the explicit link back to the search strategy.
+  blog: {
+    angle: string;
+    emphasis: string;
+    search_strategy_link: string;
+  };
+  linkedin: OpportunityBriefChannelAdaptationItem;
+  instagram_facebook: OpportunityBriefChannelAdaptationItem;
+  // PR is opt-in by design. `is_relevant` is a boolean rather than free text
+  // so a press angle cannot be quietly invented for an Opportunity that has
+  // no genuine news value — when false, `angle_or_reason` says why not.
+  pr_media: {
+    is_relevant: boolean;
+    angle_or_reason: string;
+  };
+};
+
 // Evidence strength = how strong the supporting Codepresso evidence for
 // this Opportunity is. Kept identical to Yeonwoo's canonical hierarchy
 // (origin/yeonwoo evidence-strength taxonomy) so the two modules share one
@@ -167,6 +207,11 @@ export type OpportunityBrief = {
   recommended_target_audience: string;
   recommended_channel: OpportunityBriefChannelRecommendation;
   alternative_channels: OpportunityBriefAlternativeChannel[];
+  // Optional so briefs generated before the Channel Adaptation upgrade still
+  // satisfy this type. When present the card shows the adaptation plan and
+  // hides the older recommended/alternative channel blocks, which remain
+  // populated as a fallback.
+  channel_adaptation?: OpportunityBriefChannelAdaptation;
   // Optional so existing callers/mock data built before this field existed
   // keep compiling without changes (safer for Seojin's integration).
   search_strategy?: OpportunityBriefSearchStrategy;
