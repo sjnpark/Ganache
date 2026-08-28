@@ -384,6 +384,18 @@ export function RadarWizard({
                       · {e.content_title} ({e.channel}) — qualified 문의{" "}
                       {e.qualified_leads}건
                       <span className="text-neutral-400"> / 매칭: {e.matched_via}</span>
+                      {/* Display-only: seeded demo rows carry a [DEMO] title
+                          prefix. Labelled explicitly so a synthetic record is
+                          never mistaken for a real Codepresso outcome during
+                          the demo (CLAUDE.md Section 9). */}
+                      {e.content_title.startsWith("[DEMO]") && (
+                        <span className="block mt-0.5 text-amber-700 dark:text-amber-400">
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 font-medium">
+                            Demo Internal Evidence
+                          </span>{" "}
+                          Synthetic data for prototype demonstration
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
