@@ -1,4 +1,5 @@
 import { generateJson } from "./gemini";
+import { searchContextText } from "./search-context";
 import {
   KNOWN_CHANNELS,
   type GenerateOpportunityBriefInput,
@@ -49,6 +50,16 @@ type GeneratedBriefJudgment = {
     subheading_keywords: string[];
     target_search_intent: string;
     decision_maker_fit: string;
+    // Added by the Search & AI Discovery upgrade. Optional here because the
+    // model may omit them, and normalizeSearchStrategy drops empties rather
+    // than emitting blank rows.
+    primary_keyword?: string;
+    why_this_keyword?: string;
+    search_competitor_insight?: string;
+    content_framing?: string;
+    aeo_questions?: string[];
+    geo_entity_angle?: string;
+    evidence_rationale?: string;
   };
   main_content_angle: string;
   talking_points: string[];
@@ -108,13 +119,31 @@ const INSTRUCTION = `
 - 가장 적합한 채널 1개만 recommended_channel로 선정하고, 왜 그 채널인지 reason에 구체적으로 설명하세요.
 - alternative_channels에는 recommended_channel과 다른 채널 중 실제로 쓸만한 것 2~4개를 제시하고, 각각 짧은 suggested_format_or_angle을 붙이세요. channel 값도 위 목록 중에서만 고르세요.
 
-[검색/키워드 전략] — Codepresso 인바운드의 70~80%가 검색(구글/네이버)에서 발생하므로, 채널 추천만큼 중요하게 다루세요.
-- recommended_keywords는 3~5개, 오직 주어진 시장 신호와 Codepresso 비즈니스 컨텍스트에 근거해서만 제안하세요. 검색량 숫자, SEO 점수, 순위는 절대 만들어내지 마세요.
-- seo_title_direction은 완성된 최종 기사 제목이 아니라, 제목이 잡아야 할 방향성 또는 예시 1~2개면 충분합니다.
-- subheading_keywords에는 본문 소제목(H2/H3)에 들어가야 할 핵심 용어를 제시하세요.
-- target_search_intent에는 이 주제를 검색하는 엔터프라이즈 의사결정자가 실제로 알고 싶어하거나 해결하고 싶어하는 것을 쓰세요.
-- decision_maker_fit에는 이 주제/메시지가 왜 Codepresso의 시니어 엔터프라이즈 독자(팀장/임원/C-Level)에게 적합한지 쓰세요.
-- 경쟁사가 특정 키워드에서 실제로 랭킹하고 있다는 근거가 주어지지 않았다면, 경쟁사가 그 키워드를 장악하고 있다고 주장하지 마세요.
+[검색 & AI 발견 전략] — Codepresso 인바운드의 70~80%가 검색(구글/네이버)에서 발생하므로, 채널 추천만큼 중요하게 다루세요.
+아래 8개 규칙은 항상 적용됩니다. 아래에 별도로 주어지는 "검색 환경 관측 결과"는 시점이 찍힌 참고 근거이며, 규칙과 충돌하면 규칙을 따르세요.
+
+규칙 1. 모호한 키워드를 검색 의도 설명 없이 추천하지 마세요.
+규칙 2. 일반 키워드의 실제 검색 의도가 Codepresso의 B2B 의도와 다르면, 임직원 / 조직 / 전사 / 기업 같은 한정어를 붙여 좁히세요.
+규칙 3. 근거가 뒷받침할 때는 일반적인 "교육 제공사" 표현보다 Codepresso가 강한 측정·진단·검증 각도를 우선하세요.
+규칙 4. aeo_questions에 의사결정자가 AI 어시스턴트에게 실제로 물어볼 법한 자연어 질문을 최소 1개 넣으세요.
+규칙 5. 검색 결과를 점유한 곳(검색 경쟁자)과 사업 경쟁사를 구분해서 쓰세요. 같은 집합이 아닙니다.
+규칙 6. primary_keyword를 하나 고르고, why_this_keyword에 왜 그 키워드/표현을 골랐는지 반드시 설명하세요. 한정어를 붙였다면 그 이유도 쓰세요.
+규칙 7. 검색량, CTR, 순위, 트래픽, 전환 수치를 절대 지어내지 마세요. 측정된 값이 주어지지 않았다면 없다고 쓰세요.
+규칙 8. 비교 / 연도 / 비용 / 국비지원 / 판단 기준 / 사례 / 구체적 숫자 / 실행 설계 같은 프레이밍은 이 주제에 실제로 맞을 때만 쓰는 선택지입니다. 매 Brief에 억지로 넣지 마세요. 맞는 게 없으면 content_framing을 생략하세요.
+
+필드별 작성 지침:
+- primary_keyword: 이 콘텐츠가 노릴 핵심 키워드 1개.
+- why_this_keyword: 규칙 6에 따른 선택 이유.
+- target_search_intent: 이 키워드를 검색하는 사람이 실제로 알고 싶어하거나 해결하려는 것.
+- recommended_keywords: primary를 보조하는 키워드 3~5개.
+- search_competitor_insight: 이 영역 검색 결과를 누가 점유하고 있고 Codepresso는 어디에 서 있는지. 근거가 없으면 "관측 근거 없음"이라고 쓰세요.
+- content_framing: 규칙 8. 선택적.
+- seo_title_direction: 완성된 제목이 아니라 방향성 또는 예시 1~2개.
+- subheading_keywords: H2/H3 소제목에 들어갈 핵심 용어.
+- aeo_questions: 규칙 4. 자연어 질문 형태로.
+- geo_entity_angle: "어떤 회사가 X를 하나?"라고 AI에 물었을 때 Codepresso가 호명되려면 어떤 엔티티로 포지셔닝해야 하는지.
+- evidence_rationale: 이 전략이 어떤 관측 근거에 기반했는지, 그리고 무엇이 측정 불가였는지. 규칙 7 준수.
+- decision_maker_fit: 이 주제가 왜 시니어 엔터프라이즈 독자(팀장/임원/C-Level)에게 적합한지.
 
 [핵심 talking points]
 - talking_points는 정확히 2~3개만.
@@ -139,7 +168,7 @@ const INSTRUCTION = `
 - confidence는 0.0~1.0 사이 숫자로, 이 추천에 대한 확신도를 나타내세요.
 
 다음 JSON 형식으로만 응답하세요:
-{"opportunity_title": "...", "why_now": "...", "recommended_target_audience": "...", "recommended_channel": {"channel": "...", "label": "...", "reason": "..."}, "alternative_channels": [{"channel": "...", "label": "...", "suggested_format_or_angle": "..."}], "search_strategy": {"recommended_keywords": ["...", "..."], "seo_title_direction": "...", "subheading_keywords": ["...", "..."], "target_search_intent": "...", "decision_maker_fit": "..."}, "main_content_angle": "...", "talking_points": ["...", "..."], "recommended_marketing_action": "...", "success_metrics": [{"metric": "...", "category": "...", "rationale": "..."}], "confidence": 0.0}
+{"opportunity_title": "...", "why_now": "...", "recommended_target_audience": "...", "recommended_channel": {"channel": "...", "label": "...", "reason": "..."}, "alternative_channels": [{"channel": "...", "label": "...", "suggested_format_or_angle": "..."}], "search_strategy": {"primary_keyword": "...", "why_this_keyword": "...", "target_search_intent": "...", "recommended_keywords": ["...", "..."], "search_competitor_insight": "...", "content_framing": "...", "seo_title_direction": "...", "subheading_keywords": ["...", "..."], "aeo_questions": ["...", "..."], "geo_entity_angle": "...", "evidence_rationale": "...", "decision_maker_fit": "..."}, "main_content_angle": "...", "talking_points": ["...", "..."], "recommended_marketing_action": "...", "success_metrics": [{"metric": "...", "category": "...", "rationale": "..."}], "confidence": 0.0}
 `.trim();
 
 function normalizeChannel(
@@ -184,12 +213,28 @@ function normalizeSearchStrategy(
   raw: GeneratedBriefJudgment["search_strategy"] | undefined
 ): OpportunityBriefSearchStrategy | undefined {
   if (!raw) return undefined;
+  // Optional fields are left undefined when the model omits them (or returns
+  // an empty string) so the card renders nothing rather than an empty row.
+  const text = (v: string | undefined) => {
+    const t = v?.trim();
+    return t ? t : undefined;
+  };
   return {
     recommended_keywords: (raw.recommended_keywords ?? []).slice(0, 5),
     seo_title_direction: raw.seo_title_direction ?? "",
     subheading_keywords: raw.subheading_keywords ?? [],
     target_search_intent: raw.target_search_intent ?? "",
     decision_maker_fit: raw.decision_maker_fit ?? "",
+    primary_keyword: text(raw.primary_keyword),
+    why_this_keyword: text(raw.why_this_keyword),
+    search_competitor_insight: text(raw.search_competitor_insight),
+    content_framing: text(raw.content_framing),
+    aeo_questions: (raw.aeo_questions ?? [])
+      .map((q) => q?.trim())
+      .filter((q): q is string => Boolean(q))
+      .slice(0, 4),
+    geo_entity_angle: text(raw.geo_entity_angle),
+    evidence_rationale: text(raw.evidence_rationale),
   };
 }
 
@@ -225,6 +270,8 @@ ${evidenceText(input.internalEvidence)}
 
 [Codepresso 비즈니스 컨텍스트]
 ${businessContextText(input.businessContext)}
+
+${searchContextText()}
 `.trim();
 
   const judgment = await generateJson<GeneratedBriefJudgment>({

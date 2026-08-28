@@ -124,12 +124,41 @@ export type OpportunityBriefSource = {
 // title/subheading choices matter as much as channel choice. Never carries
 // invented search volume, SEO score, or ranking numbers (nothing here is
 // backed by real search data).
+// "Search & AI Discovery Strategy".
+//
+// The five original fields are unchanged and still required, so briefs
+// generated before the AEO/GEO upgrade still satisfy this type. Everything
+// added for that upgrade is optional, and the UI renders each field only when
+// present — an older brief object simply shows fewer rows.
 export type OpportunityBriefSearchStrategy = {
-  recommended_keywords: string[]; // ideally 3-5, grounded only in the supplied signal + business context
+  recommended_keywords: string[]; // supporting keywords; 3-5, grounded only in the supplied signal + business context
   seo_title_direction: string; // a direction or 1-2 examples, not a finished article title
   subheading_keywords: string[]; // key terms that should appear in H2/H3-style subheadings
   target_search_intent: string; // what the enterprise decision-maker is trying to learn/solve
   decision_maker_fit: string; // why this matters to Codepresso's senior enterprise audience
+
+  // The single keyword the piece should be built around. Separated from the
+  // supporting list so the brief commits to one primary target.
+  primary_keyword?: string;
+  // Rule 6: the primary keyword must come with its reasoning, including any
+  // modifier added to disambiguate a generic term.
+  why_this_keyword?: string;
+  // Rule 5: who actually occupies the SERP, which is not the same set as the
+  // business competitors in CLAUDE.md 3.2.
+  search_competitor_insight?: string;
+  // Rule 8: an optional framing choice (comparison / year / cost / decision
+  // criteria / case study / concrete numbers / implementation design) with the
+  // reason it fits THIS brief. Omitted when none genuinely applies.
+  content_framing?: string;
+  // Rule 4: natural-language questions a decision-maker would ask an AI
+  // assistant, so the content can be surfaced by answer engines.
+  aeo_questions?: string[];
+  // How Codepresso should be positioned as an entity for this topic, so a
+  // generative engine names it when asked "which company does X".
+  geo_entity_angle?: string;
+  // Rule 7: which observed evidence this strategy rests on, and what was not
+  // measurable. Never contains volume, CTR, ranking or traffic figures.
+  evidence_rationale?: string;
 };
 
 export type OpportunityBrief = {

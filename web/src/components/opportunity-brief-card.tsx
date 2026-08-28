@@ -12,6 +12,21 @@ import type { OpportunityBrief } from "@/lib/opportunity-brief-types";
 
 type Decision = "approved" | "rejected" | null;
 
+// Renders one label/value row of the search strategy, and nothing at all when
+// the model omitted that field — several of them are optional by design (e.g.
+// content_framing is skipped when no observed framing genuinely fits).
+function SearchRow({ label, value }: { label: string; value?: string }) {
+  if (!value) return null;
+  return (
+    <p className="text-neutral-600 dark:text-neutral-300">
+      <span className="font-medium text-neutral-800 dark:text-neutral-100">
+        {label}:{" "}
+      </span>
+      {value}
+    </p>
+  );
+}
+
 // Pure presentation + a small "Human decision" affordance. State is local
 // by default (uncontrolled) so this drops into any page with zero setup;
 // pass onApprove/onReject if the host page (e.g. Seojin's Radar wizard)
@@ -92,12 +107,30 @@ export function OpportunityBriefCard({
 
         {brief.search_strategy && (
           <div className="rounded-md border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 px-3 py-2.5">
-            <p className="font-medium">🔍 검색/키워드 전략</p>
+            <p className="font-medium">🔍 검색 &amp; AI 발견 전략</p>
             <div className="mt-2 flex flex-col gap-2">
+              {brief.search_strategy.primary_keyword && (
+                <div>
+                  <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                    핵심 키워드
+                  </p>
+                  <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-medium">
+                    {brief.search_strategy.primary_keyword}
+                  </span>
+                </div>
+              )}
+              <SearchRow
+                label="이 키워드를 고른 이유"
+                value={brief.search_strategy.why_this_keyword}
+              />
+              <SearchRow
+                label="검색 의도"
+                value={brief.search_strategy.target_search_intent}
+              />
               {brief.search_strategy.recommended_keywords.length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                    추천 키워드
+                    보조 키워드
                   </p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {brief.search_strategy.recommended_keywords.map((kw, i) => (
@@ -111,38 +144,58 @@ export function OpportunityBriefCard({
                   </div>
                 </div>
               )}
-              {brief.search_strategy.seo_title_direction && (
-                <p className="text-neutral-600 dark:text-neutral-300">
-                  <span className="font-medium text-neutral-800 dark:text-neutral-100">
-                    제목 방향:{" "}
-                  </span>
-                  {brief.search_strategy.seo_title_direction}
-                </p>
-              )}
+              <SearchRow
+                label="검색 경쟁 상황"
+                value={brief.search_strategy.search_competitor_insight}
+              />
+              <SearchRow
+                label="콘텐츠 프레이밍"
+                value={brief.search_strategy.content_framing}
+              />
+              <SearchRow
+                label="제목 방향"
+                value={brief.search_strategy.seo_title_direction}
+              />
               {brief.search_strategy.subheading_keywords.length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                    소제목(H2/H3) 키워드
+                    소제목(H2/H3) 가이드
                   </p>
                   <p className="text-neutral-600 dark:text-neutral-300">
                     {brief.search_strategy.subheading_keywords.join(" · ")}
                   </p>
                 </div>
               )}
-              {brief.search_strategy.target_search_intent && (
-                <p className="text-neutral-600 dark:text-neutral-300">
-                  <span className="font-medium text-neutral-800 dark:text-neutral-100">
-                    검색 의도:{" "}
-                  </span>
-                  {brief.search_strategy.target_search_intent}
-                </p>
-              )}
-              {brief.search_strategy.decision_maker_fit && (
-                <p className="text-neutral-600 dark:text-neutral-300">
-                  <span className="font-medium text-neutral-800 dark:text-neutral-100">
-                    의사결정자 적합성:{" "}
-                  </span>
-                  {brief.search_strategy.decision_maker_fit}
+              {brief.search_strategy.aeo_questions &&
+                brief.search_strategy.aeo_questions.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                      AEO 질문 (AI에게 이렇게 물어볼 때 노출되도록)
+                    </p>
+                    <ul className="mt-1 flex flex-col gap-0.5">
+                      {brief.search_strategy.aeo_questions.map((q, i) => (
+                        <li
+                          key={i}
+                          className="text-neutral-600 dark:text-neutral-300"
+                        >
+                          · {q}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              <SearchRow
+                label="GEO / 엔티티 각도"
+                value={brief.search_strategy.geo_entity_angle}
+              />
+              <SearchRow
+                label="의사결정자 적합성"
+                value={brief.search_strategy.decision_maker_fit}
+              />
+              {brief.search_strategy.evidence_rationale && (
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 border-t border-neutral-200 dark:border-neutral-800 pt-2">
+                  <span className="font-medium">근거: </span>
+                  {brief.search_strategy.evidence_rationale}
                 </p>
               )}
             </div>
